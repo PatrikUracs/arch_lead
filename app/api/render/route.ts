@@ -39,9 +39,15 @@ async function generateOne(prompt: string, imageUrl?: string): Promise<string> {
     input.strength = 0.65
   }
 
-  const result = await fal.subscribe('fal-ai/flux/schnell', { input })
+  let result: unknown
+  try {
+    result = await fal.subscribe('fal-ai/flux/schnell', { input })
+  } catch (e) {
+    console.error('fal.subscribe threw:', JSON.stringify(e), e)
+    throw e
+  }
   console.log('fal.ai raw result:', JSON.stringify(result))
-  const data = ((result as unknown as { data: FalImageResult })?.data ?? result) as FalImageResult
+  const data = ((result as { data?: FalImageResult })?.data ?? result) as FalImageResult
   const url = data?.images?.[0]?.url
   if (!url) throw new Error('No image URL returned from fal.ai')
   return url
