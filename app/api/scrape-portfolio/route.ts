@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
 
         if (images.length > 0) {
           const result = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-6',
             max_tokens: 200,
             system:
               'You are an expert interior design analyst. You examine a designer\'s portfolio images and produce a precise, usable style description that will later be fed into an AI image generator. Focus on recurring visual signatures, not one-off elements.',

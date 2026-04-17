@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { waitUntil } from '@vercel/functions'
 
 export const runtime = 'nodejs'
 
@@ -75,11 +76,13 @@ async function handlePost(req: NextRequest) {
   }
 
   if (process.env.NEXT_PUBLIC_APP_URL && body.portfolioUrl?.trim()) {
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/scrape-portfolio`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ designer_slug: body.slug.trim() }),
-    }).catch((err) => console.error('Scrape-portfolio trigger failed:', err))
+    waitUntil(
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/scrape-portfolio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ designer_slug: body.slug.trim() }),
+      }).catch((err) => console.error('Scrape-portfolio trigger failed:', err))
+    )
   }
 
   return NextResponse.json({ success: true })

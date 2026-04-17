@@ -198,7 +198,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'At least one photo is required' }, { status: 400 })
   }
 
-  const designerName = process.env.DESIGNER_NAME || 'Patrik Uracs'
   const designerEmail = process.env.DESIGNER_EMAIL
 
   if (!process.env.GROQ_API_KEY) {
@@ -219,6 +218,8 @@ export async function POST(req: NextRequest) {
     analyseRoomPhotos(body.photoUrls),
     fetchDesignerProfile(),
   ])
+
+  const designerName = designerProfile?.studio_name || designerProfile?.name || process.env.DESIGNER_NAME || 'Your designer'
 
   // ── 2. Build designer context for Groq prompt ─────────────────────────────
   const designerContext = designerProfile

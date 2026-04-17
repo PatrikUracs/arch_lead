@@ -25,6 +25,24 @@ function buildPrompt(
   return `${styleBase}, ${designStyle}, ${roomType}, photorealistic interior architecture photography, natural window light, editorial quality, 8K, ultra detailed, no people`
 }
 
+async function storeRender(
+  supabase: ReturnType<typeof import('@supabase/supabase-js').createClient>,
+  replicateUrl: string,
+  submissionId: string,
+  index: number
+): Promise<string> {
+  const res = await fetch(replicateUrl, { signal: AbortSignal.timeout(30000) })
+  if (!res.ok) throw new Error(`Failed to fetch render from Replicate: ${res.status}`)
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const path = `submissions/${submissionId}/render-${index}.jpg`
+  const { error } = await supabase.storage
+    .from('renders')
+    .upload(path, buffer, { contentType: 'image/jpeg', upsert: true })
+  if (error) throw new Error(`Failed to upload render to storage: ${error.message}`)
+  const { data } = supabase.storage.from('renders').getPublicUrl(path)
+  return data.publicUrl
+}
+
 async function generateOne(prompt: string, imageUrl: string): Promise<string> {
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
@@ -154,11 +172,15 @@ export async function POST(req: NextRequest) {
   const firstPhoto: string = submission.photo_urls[0]
 
   try {
-    const urls = await Promise.all([
+    const replicateUrls = await Promise.all([
       generateOne(prompt, firstPhoto),
       generateOne(prompt, firstPhoto),
       generateOne(prompt, firstPhoto),
     ])
+
+    const urls = await Promise.all(
+      replicateUrls.map((url, i) => storeRender(supabase, url, submissionId, i))
+    )
 
     await supabase
       .from('submissions')
