@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
+import Replicate from 'replicate'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60 // Vercel Hobby max — flux/schnell completes 3 images in ~20s
-
-type FalImageResult = {
-  images: Array<{ url: string }>
-}
+export const maxDuration = 60
 
 function getSupabase() {
   return createClient(
@@ -22,34 +18,21 @@ function buildPrompt(styleKeywords: string[], designStyle: string, roomType: str
   return `Interior design concept render, ${keywordsStr}, ${designStyle}, ${roomType}, photorealistic, natural light, architectural photography, 8K, ultra detailed, no people, editorial interior photography`
 }
 
-async function generateOne(prompt: string, imageUrl?: string): Promise<string> {
-  fal.config({ credentials: process.env.FAL_API_KEY })
+async function generateOne(prompt: string): Promise<string> {
+  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const input: any = {
-    prompt,
-    num_images: 1,
-    image_size: 'landscape_4_3',
-    num_inference_steps: 4,
-    enable_safety_checker: true,
-  }
+  const output = await replicate.run('black-forest-labs/flux-schnell', {
+    input: {
+      prompt,
+      num_outputs: 1,
+      aspect_ratio: '4:3',
+      num_inference_steps: 4,
+      output_format: 'webp',
+    },
+  }) as string[]
 
-  if (imageUrl) {
-    input.image_url = imageUrl
-    input.strength = 0.65
-  }
-
-  let result: unknown
-  try {
-    result = await fal.subscribe('fal-ai/flux/schnell', { input })
-  } catch (e) {
-    console.error('fal.subscribe threw:', JSON.stringify(e), e)
-    throw e
-  }
-  console.log('fal.ai raw result:', JSON.stringify(result))
-  const data = ((result as { data?: FalImageResult })?.data ?? result) as FalImageResult
-  const url = data?.images?.[0]?.url
-  if (!url) throw new Error('No image URL returned from fal.ai')
+  const url = Array.isArray(output) ? output[0] : null
+  if (!url) throw new Error('No image URL returned from Replicate')
   return url
 }
 
@@ -110,13 +93,12 @@ export async function POST(req: NextRequest) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ error: 'Missing Supabase config' }, { status: 500 })
   }
-  if (!process.env.FAL_API_KEY) {
-    return NextResponse.json({ error: 'Missing FAL_API_KEY' }, { status: 500 })
+  if (!process.env.REPLICATE_API_TOKEN) {
+    return NextResponse.json({ error: 'Missing REPLICATE_API_TOKEN' }, { status: 500 })
   }
 
   const supabase = getSupabase()
 
-  // Fetch submission
   const { data: submission, error: subErr } = await supabase
     .from('submissions')
     .select('id, designer_slug, client_email, client_name, room_type, design_style, photo_urls, brief, results_page_token')
@@ -128,7 +110,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Submission not found' }, { status: 404 })
   }
 
-  // Fetch designer
   const { data: designer } = await supabase
     .from('designers')
     .select('name, studio_name, style_keywords, calendly_url, is_paid')
@@ -137,23 +118,19 @@ export async function POST(req: NextRequest) {
 
   const styleKeywords: string[] = designer?.style_keywords ?? []
   const prompt = buildPrompt(styleKeywords, submission.design_style, submission.room_type)
-  const firstPhoto: string | undefined = submission.photo_urls?.[0]
 
   try {
-    // Generate 3 images in parallel
     const urls = await Promise.all([
-      generateOne(prompt, firstPhoto),
-      generateOne(prompt, firstPhoto),
-      generateOne(prompt, firstPhoto),
+      generateOne(prompt),
+      generateOne(prompt),
+      generateOne(prompt),
     ])
 
-    // Store results
     await supabase
       .from('submissions')
       .update({ render_urls: urls, render_status: 'complete' })
       .eq('id', submissionId)
 
-    // Send client results email
     const studioName = designer?.studio_name || designer?.name || 'Your designer'
     const designerName = designer?.name || 'Your designer'
     try {
@@ -167,7 +144,6 @@ export async function POST(req: NextRequest) {
       })
     } catch (emailErr) {
       console.error('Results email failed:', emailErr)
-      // Don't fail the whole render if email fails
     }
 
     return NextResponse.json({ success: true })
