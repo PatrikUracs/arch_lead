@@ -13,26 +13,52 @@ function getSupabase() {
   )
 }
 
-function buildPrompt(styleKeywords: string[], designStyle: string, roomType: string): string {
-  const keywordsStr = styleKeywords.length > 0 ? styleKeywords.join(', ') : 'contemporary, refined'
-  return `Interior design concept render, ${keywordsStr}, ${designStyle}, ${roomType}, photorealistic, natural light, architectural photography, 8K, ultra detailed, no people, editorial interior photography`
+function buildPrompt(
+  aiStyleProfile: string | null,
+  styleKeywords: string[],
+  designStyle: string,
+  roomType: string
+): string {
+  const styleBase =
+    aiStyleProfile?.trim() ||
+    (styleKeywords.length > 0 ? styleKeywords.join(', ') : 'contemporary, refined')
+  return `${styleBase}, ${designStyle}, ${roomType}, photorealistic interior architecture photography, natural window light, editorial quality, 8K, ultra detailed, no people`
 }
 
-async function generateOne(prompt: string): Promise<string> {
+async function generateOne(prompt: string, imageUrl: string): Promise<string> {
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
-  const output = await replicate.run('black-forest-labs/flux-schnell', {
+  const output = await replicate.run('jagilley/controlnet-depth:865a52cfc447e048994ea6d4038ba65d6d74c574162b6f54ba4b3cd25c0e0e4b', {
     input: {
+      image: imageUrl,
       prompt,
-      num_outputs: 1,
-      aspect_ratio: '4:3',
-      num_inference_steps: 4,
-      output_format: 'webp',
+      num_samples: '1',
+      image_resolution: 768,
+      detect_resolution: 384,
+      scale: 9,
+      ddim_steps: 20,
+      eta: 0,
+      a_prompt: 'best quality, extremely detailed, photorealistic, architectural photography',
+      n_prompt:
+        'longbody, lowres, bad anatomy, bad hands, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, people, person, human, figures, text, watermark, signature, deformed',
     },
-  }) as string[]
+  })
 
-  const url = Array.isArray(output) ? output[0] : null
-  if (!url) throw new Error('No image URL returned from Replicate')
+  console.log('Replicate output:', JSON.stringify(output))
+
+  const items = Array.isArray(output) ? output : [output]
+  const url = items.map((item: unknown) => {
+    if (typeof item === 'string') return item
+    if (item && typeof item === 'object' && 'url' in item && typeof (item as { url: unknown }).url === 'function') {
+      return (item as { url: () => string }).url()
+    }
+    if (item && typeof item === 'object' && 'url' in item) {
+      return String((item as { url: unknown }).url)
+    }
+    return String(item)
+  })[0]
+
+  if (!url || url === '[object Object]') throw new Error('No image URL returned from Replicate')
   return url
 }
 
@@ -44,10 +70,14 @@ async function sendResultsEmail(params: {
   studioName: string
   designerName: string
 }) {
-  if (!process.env.RESEND_API_KEY || !process.env.NEXT_PUBLIC_APP_URL) return
+  if (!process.env.RESEND_API_KEY || !process.env.NEXT_PUBLIC_APP_URL) {
+    console.error('Results email skipped — missing RESEND_API_KEY or NEXT_PUBLIC_APP_URL')
+    return
+  }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
   const resultsUrl = `${process.env.NEXT_PUBLIC_APP_URL}/results/${params.token}`
+  console.log('Sending results email to:', params.clientEmail, 'url:', resultsUrl)
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -72,12 +102,13 @@ async function sendResultsEmail(params: {
 </body>
 </html>`
 
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: `${params.designerName} <onboarding@resend.dev>`,
     to: [params.clientEmail],
     subject: `Your concept is ready — ${params.studioName}`,
     html,
   })
+  console.log('Results email sent:', JSON.stringify(result))
 }
 
 export async function POST(req: NextRequest) {
@@ -112,18 +143,21 @@ export async function POST(req: NextRequest) {
 
   const { data: designer } = await supabase
     .from('designers')
-    .select('name, studio_name, style_keywords, calendly_url, is_paid')
+    .select('name, studio_name, style_keywords, ai_style_profile, calendly_url, is_paid')
     .eq('slug', submission.designer_slug)
     .single()
 
   const styleKeywords: string[] = designer?.style_keywords ?? []
-  const prompt = buildPrompt(styleKeywords, submission.design_style, submission.room_type)
+  const aiStyleProfile: string | null = designer?.ai_style_profile ?? null
+  const prompt = buildPrompt(aiStyleProfile, styleKeywords, submission.design_style, submission.room_type)
+
+  const firstPhoto: string = submission.photo_urls[0]
 
   try {
     const urls = await Promise.all([
-      generateOne(prompt),
-      generateOne(prompt),
-      generateOne(prompt),
+      generateOne(prompt, firstPhoto),
+      generateOne(prompt, firstPhoto),
+      generateOne(prompt, firstPhoto),
     ])
 
     await supabase

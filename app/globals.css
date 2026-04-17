@@ -2,26 +2,161 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Base ─────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background-color: #0A0A0A;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(ellipse at center, #141414 0%, #0A0A0A 70%);
+  background-attachment: fixed;
+  color: #F5F0E8;
+  min-height: 100vh;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* ── Webkit Scrollbar ─────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 169, 110, 0.3);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 169, 110, 0.5);
+}
+
+/* ── Form inputs ──────────────────────────────────────────────── */
+
+.form-input {
+  width: 100%;
+  background: #1A1A1A;
+  border: 1px solid rgba(201, 169, 110, 0.15);
+  color: #F5F0E8;
+  border-radius: 2px;
+  padding: 13px 16px;
+  font-size: 13px;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-weight: 200;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  outline: none;
+  line-height: 1.5;
+}
+
+.form-input::placeholder {
+  color: rgba(245, 240, 232, 0.2);
+}
+
+.form-input:focus {
+  border-color: #C9A96E;
+  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.07);
+}
+
+textarea.form-input {
+  min-height: 110px;
+  resize: vertical;
+}
+
+/* ── Select dropdown arrow ────────────────────────────────────── */
+
+select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23C9A96E' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 44px;
+  cursor: pointer;
+}
+
+select.form-input option {
+  background: #1A1A1A;
+  color: #F5F0E8;
+}
+
+/* ── Card layout ──────────────────────────────────────────────── */
+
+.card-header {
+  padding: 48px 56px 36px;
+  border-bottom: 1px solid rgba(201, 169, 110, 0.1);
+}
+
+.card-body {
+  padding: 32px 56px 56px;
+}
+
+@media (max-width: 640px) {
+  .card-header {
+    padding: 28px 28px 24px;
   }
+  .card-body {
+    padding: 24px 28px 28px;
+  }
+}
+
+/* ── Section divider ──────────────────────────────────────────── */
+
+.section-divider {
+  border: none;
+  border-top: 1px solid rgba(201, 169, 110, 0.08);
+  margin: 0 -56px 16px;
+}
+
+@media (max-width: 640px) {
+  .section-divider {
+    margin: 0 -28px 16px;
+  }
+}
+
+/* ── Loading dots animation ───────────────────────────────────── */
+
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    opacity: 0.2;
+    transform: scale(0.75);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.loading-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #0A0A0A;
+  animation: dotPulse 1.4s ease-in-out infinite both;
+}
+
+.loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Radio option rows ────────────────────────────────────────── */
+
+.radio-option:hover {
+  background: rgba(201, 169, 110, 0.04) !important;
+  border-color: rgba(201, 169, 110, 0.25) !important;
+}
+
+.radio-option--checked:hover {
+  background: rgba(201, 169, 110, 0.08) !important;
+  border-color: #C9A96E !important;
+}
+
+/* ── Photo upload drop zone focus ─────────────────────────────── */
+
+.photo-drop-zone:focus-visible {
+  outline: 2px solid rgba(201, 169, 110, 0.5);
+  outline-offset: 2px;
 }
