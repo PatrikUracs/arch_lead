@@ -191,13 +191,13 @@ function ResponseModal({ sub, onClose }: { sub: Submission; onClose: () => void 
   const subject = sub.ai_response_subject ?? ''
 
   function openInEmailClient() {
-    const mailto = `mailto:${encodeURIComponent(sub.client_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`
+    const mailto = `mailto:${encodeURIComponent(sub.client_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft ?? '')}`
     window.open(mailto)
   }
 
   async function copyToClipboard() {
     try {
-      await navigator.clipboard.writeText(draft)
+      await navigator.clipboard.writeText(draft ?? '')
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
