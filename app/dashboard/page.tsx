@@ -187,7 +187,7 @@ function ResponseModal({ sub, onClose }: { sub: Submission; onClose: () => void 
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const draft = sub.ai_response_draft ?? ''
+  const draft = sub.ai_response_draft ?? null
   const subject = sub.ai_response_subject ?? ''
 
   function openInEmailClient() {
@@ -272,16 +272,16 @@ function ResponseModal({ sub, onClose }: { sub: Submission; onClose: () => void 
             fontFamily: 'var(--font-montserrat)',
             fontWeight: 200,
             fontSize: 13,
-            color: 'rgba(245,240,232,0.75)',
+            color: draft ? 'rgba(245,240,232,0.75)' : 'rgba(245,240,232,0.25)',
             lineHeight: 1.8,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             marginBottom: 20,
           }}
         >
-          {draft}
+          {draft ?? 'No draft available for this submission. Drafts are generated for new submissions only.'}
         </div>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: draft ? 'flex' : 'none', gap: 12, marginBottom: 16 }}>
           <button
             onClick={openInEmailClient}
             style={{
@@ -791,26 +791,24 @@ export default function DashboardPage() {
                                     View results
                                   </a>
                                 )}
-                                {sub.ai_response_draft && (
-                                  <button
-                                    onClick={() => setResponseModal(sub)}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      fontFamily: 'var(--font-montserrat)',
-                                      fontSize: 10,
-                                      fontWeight: 300,
-                                      letterSpacing: '0.1em',
-                                      color: 'rgba(201,169,110,0.7)',
-                                      cursor: 'pointer',
-                                      textTransform: 'uppercase',
-                                      padding: 0,
-                                      textDecoration: 'underline',
-                                    }}
-                                  >
-                                    Draft response
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => setResponseModal(sub)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontFamily: 'var(--font-montserrat)',
+                                    fontSize: 10,
+                                    fontWeight: 300,
+                                    letterSpacing: '0.1em',
+                                    color: 'rgba(201,169,110,0.7)',
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase',
+                                    padding: 0,
+                                    textDecoration: 'underline',
+                                  }}
+                                >
+                                  Draft response
+                                </button>
                               </div>
                             </td>
                           </tr>
