@@ -17,7 +17,6 @@ type DesignerData = {
   name: string
   studio_name: string | null
   calendly_url: string | null
-  is_paid: boolean
 }
 
 type ResultsData = {
@@ -50,52 +49,6 @@ function extractBriefSections(brief: string): { label: string; content: string }
   }
 
   return sections
-}
-
-/* ── Watermark overlay ───────────────────────────────────────────── */
-function Watermark() {
-  const rows = Array.from({ length: 8 })
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        pointerEvents: 'none',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-around',
-      }}
-    >
-      {rows.map((_, i) => (
-        <div
-          key={i}
-          style={{
-            display: 'flex',
-            gap: 48,
-            transform: i % 2 === 0 ? 'rotate(-25deg) translateX(-10%)' : 'rotate(-25deg) translateX(10%)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {Array.from({ length: 6 }).map((__, j) => (
-            <span
-              key={j}
-              style={{
-                fontFamily: 'var(--font-montserrat, sans-serif)',
-                fontSize: 11,
-                fontWeight: 200,
-                color: 'rgba(245, 240, 232, 0.18)',
-                letterSpacing: '0.1em',
-                userSelect: 'none',
-              }}
-            >
-              Preview — DesignLead
-            </span>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
 }
 
 /* ── Loading pulse line ──────────────────────────────────────────── */
@@ -333,7 +286,6 @@ export default function ResultsPage() {
   const studioName = designer?.studio_name || designerName
   const briefSections = submission.brief ? extractBriefSections(submission.brief) : []
   const renderUrls = submission.render_urls ?? []
-  const isPaid = designer?.is_paid ?? false
 
   return (
     <div style={bgStyle} className="px-4 py-16">
@@ -411,7 +363,6 @@ export default function ResultsPage() {
                     borderRadius: 2,
                   }}
                 />
-                {!isPaid && <Watermark />}
               </div>
             ))}
           </div>

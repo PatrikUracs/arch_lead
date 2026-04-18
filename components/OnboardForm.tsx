@@ -10,6 +10,7 @@ type FormData = {
   typicalProjectSize: string
   ratePerSqm: string
   bio: string
+  responseTone: string
   calendlyUrl: string
 }
 
@@ -72,6 +73,7 @@ export default function OnboardForm({ slug, accessKey }: { slug: string; accessK
     typicalProjectSize: '',
     ratePerSqm: '',
     bio: '',
+    responseTone: '',
     calendlyUrl: '',
   })
   const [status, setStatus] = useState<Status>('idle')
@@ -109,6 +111,7 @@ export default function OnboardForm({ slug, accessKey }: { slug: string; accessK
           typicalProjectSize: form.typicalProjectSize || undefined,
           ratePerSqm: form.ratePerSqm || undefined,
           bio: form.bio || undefined,
+          responseTone: form.responseTone || undefined,
           calendlyUrl: form.calendlyUrl || undefined,
           key: accessKey,
         }),
@@ -283,6 +286,66 @@ export default function OnboardForm({ slug, accessKey }: { slug: string; accessK
                     placeholder="2–3 sentences about your design approach…"
                     className="form-input"
                   />
+                </div>
+
+                <div>
+                  <FieldLabel>Response tone *</FieldLabel>
+                  <FieldHint>How should AI-drafted client responses sound?</FieldHint>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                    {[
+                      { value: 'warm', label: 'Warm and personal', desc: 'Friendly, approachable, uses the client\'s first name often' },
+                      { value: 'professional', label: 'Professional and concise', desc: 'Clear, business-focused, direct' },
+                      { value: 'enthusiastic', label: 'Enthusiastic and design-forward', desc: 'Passionate about design, expressive, creative' },
+                    ].map((opt) => {
+                      const checked = form.responseTone === opt.value
+                      return (
+                        <label
+                          key={opt.value}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                            cursor: 'pointer',
+                            padding: '11px 14px',
+                            borderRadius: 2,
+                            border: `1px solid ${checked ? '#C9A96E' : 'rgba(201,169,110,0.12)'}`,
+                            background: checked ? 'rgba(201,169,110,0.06)' : 'transparent',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="responseTone"
+                            value={opt.value}
+                            checked={checked}
+                            onChange={handleChange}
+                            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                          />
+                          <div>
+                            <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 13, fontWeight: 200, color: checked ? '#F5F0E8' : 'rgba(245,240,232,0.65)', display: 'block' }}>
+                              {opt.label}
+                            </span>
+                            <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 11, fontWeight: 200, color: 'rgba(245,240,232,0.3)' }}>
+                              {opt.desc}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              minWidth: 6,
+                              borderRadius: '50%',
+                              border: `1px solid ${checked ? '#C9A96E' : 'rgba(201,169,110,0.3)'}`,
+                              background: checked ? '#C9A96E' : 'transparent',
+                              flexShrink: 0,
+                              transition: 'all 0.2s ease',
+                            }}
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
 
               </div>

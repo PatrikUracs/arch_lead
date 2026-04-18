@@ -14,6 +14,8 @@ type Submission = {
   render_status: string
   results_page_token: string | null
   brief: string | null
+  ai_response_draft: string | null
+  ai_response_subject: string | null
 }
 
 type Designer = {
@@ -172,6 +174,179 @@ function BriefModal({ brief, onClose }: { brief: string; onClose: () => void }) 
   )
 }
 
+/* ── Response draft modal ────────────────────────────────────────── */
+function ResponseModal({ sub, onClose }: { sub: Submission; onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const draft = sub.ai_response_draft ?? ''
+  const subject = sub.ai_response_subject ?? ''
+
+  function openInEmailClient() {
+    const mailto = `mailto:${encodeURIComponent(sub.client_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`
+    window.open(mailto)
+  }
+
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(draft)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard unavailable — silently ignore
+    }
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.8)',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          background: '#111111',
+          border: '1px solid rgba(201,169,110,0.2)',
+          borderRadius: 2,
+          maxWidth: 640,
+          width: '100%',
+          maxHeight: '80vh',
+          overflow: 'auto',
+          padding: '40px',
+          position: 'relative',
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 20,
+            background: 'none',
+            border: 'none',
+            color: 'rgba(245,240,232,0.4)',
+            fontSize: 20,
+            cursor: 'pointer',
+            lineHeight: 1,
+            padding: 4,
+          }}
+          aria-label="Close"
+        >
+          ×
+        </button>
+        <p
+          style={{
+            fontFamily: 'var(--font-playfair)',
+            fontSize: 18,
+            fontWeight: 400,
+            color: '#F5F0E8',
+            marginBottom: 24,
+            letterSpacing: '0.02em',
+          }}
+        >
+          Draft response to {sub.client_name}
+        </p>
+        <div
+          style={{
+            background: '#1A1A1A',
+            border: '1px solid rgba(201,169,110,0.12)',
+            borderRadius: 2,
+            padding: '16px',
+            fontFamily: 'var(--font-montserrat)',
+            fontWeight: 200,
+            fontSize: 13,
+            color: 'rgba(245,240,232,0.75)',
+            lineHeight: 1.8,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            marginBottom: 20,
+          }}
+        >
+          {draft}
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+          <button
+            onClick={openInEmailClient}
+            style={{
+              background: '#C9A96E',
+              color: '#0A0A0A',
+              border: 'none',
+              borderRadius: 2,
+              padding: '10px 20px',
+              fontFamily: 'var(--font-montserrat)',
+              fontSize: 10,
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            Open in email client
+          </button>
+          <button
+            onClick={copyToClipboard}
+            style={{
+              background: 'transparent',
+              border: '1px solid #C9A96E',
+              color: '#C9A96E',
+              borderRadius: 2,
+              padding: '10px 20px',
+              fontFamily: 'var(--font-montserrat)',
+              fontSize: 10,
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {copied ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7L5.5 10.5L12 4" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Copied
+              </>
+            ) : 'Copy to clipboard'}
+          </button>
+        </div>
+        <p
+          style={{
+            fontFamily: 'var(--font-montserrat)',
+            fontWeight: 200,
+            fontSize: 11,
+            color: 'rgba(245,240,232,0.25)',
+            margin: 0,
+          }}
+        >
+          This is an AI-drafted starting point. Edit as needed before sending.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /* ── Password screen ─────────────────────────────────────────────── */
 function PasswordScreen({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState('')
@@ -309,6 +484,7 @@ export default function DashboardPage() {
   const [designer, setDesigner] = useState<Designer | null>(null)
   const [loadingData, setLoadingData] = useState(false)
   const [briefModal, setBriefModal] = useState<string | null>(null)
+  const [responseModal, setResponseModal] = useState<Submission | null>(null)
   const [checkmarks, setCheckmarks] = useState<Record<string, boolean>>({})
   const [notifPref, setNotifPref] = useState<'instant' | 'digest'>('instant')
   const [scrapeLoading, setScrapeLoading] = useState(false)
@@ -437,6 +613,7 @@ export default function DashboardPage() {
       `}</style>
 
       {briefModal && <BriefModal brief={briefModal} onClose={() => setBriefModal(null)} />}
+      {responseModal && <ResponseModal sub={responseModal} onClose={() => setResponseModal(null)} />}
 
       <div
         style={{ background: 'radial-gradient(ellipse at center, #141414 0%, #0A0A0A 70%)', minHeight: '100vh', padding: '40px 24px 80px' }}
@@ -613,6 +790,26 @@ export default function DashboardPage() {
                                   >
                                     View results
                                   </a>
+                                )}
+                                {sub.ai_response_draft && (
+                                  <button
+                                    onClick={() => setResponseModal(sub)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      fontFamily: 'var(--font-montserrat)',
+                                      fontSize: 10,
+                                      fontWeight: 300,
+                                      letterSpacing: '0.1em',
+                                      color: 'rgba(201,169,110,0.7)',
+                                      cursor: 'pointer',
+                                      textTransform: 'uppercase',
+                                      padding: 0,
+                                      textDecoration: 'underline',
+                                    }}
+                                  >
+                                    Draft response
+                                  </button>
                                 )}
                               </div>
                             </td>

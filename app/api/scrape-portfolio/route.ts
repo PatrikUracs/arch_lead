@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
 
 export const runtime = 'nodejs'
@@ -46,6 +47,38 @@ async function imageUrlToBase64(
     return { data: Buffer.from(buffer).toString('base64'), mediaType }
   } catch {
     return null
+  }
+}
+
+async function groqStyleFallback(designer_slug: string, styleKeywords: string[]): Promise<void> {
+  if (!process.env.GROQ_API_KEY || styleKeywords.length === 0) {
+    console.warn('Groq fallback skipped — no API key or no style keywords')
+    return
+  }
+  try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'user',
+          content: `You are an expert interior design analyst. A designer describes their style as: ${styleKeywords.join(', ')}. Write a dense style profile paragraph (max 120 words) covering: recurring materials, colour palette, lighting character, furniture silhouettes, spatial qualities. Write as a prompt fragment for an AI image generator. No headings, no bullets, no preamble.`,
+        },
+      ],
+      max_tokens: 200,
+    })
+    const profile = result.choices[0]?.message?.content?.trim() ?? ''
+    if (profile) {
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('designers')
+        .update({ ai_style_profile: profile })
+        .eq('slug', designer_slug)
+      if (error) console.error('Groq fallback: failed to save style profile:', error)
+      else console.log('Groq fallback: style profile saved successfully')
+    }
+  } catch (err) {
+    console.error('Groq style fallback failed:', err)
   }
 }
 
@@ -157,6 +190,9 @@ export async function POST(req: NextRequest) {
       .eq('slug', designer_slug)
 
     // Claude Vision style analysis
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('ANTHROPIC_API_KEY is not set — skipping style analysis')
+    }
     if (process.env.ANTHROPIC_API_KEY) {
       try {
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -165,6 +201,7 @@ export async function POST(req: NextRequest) {
           mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
         }[]
 
+        console.log(`Claude Vision: ${images.length}/${publicUrls.length} images loaded for analysis`)
         if (images.length > 0) {
           const result = await anthropic.messages.create({
             model: 'claude-sonnet-4-6',
@@ -195,17 +232,26 @@ export async function POST(req: NextRequest) {
           const styleProfile =
             result.content[0].type === 'text' ? result.content[0].text.trim() : ''
 
+          console.log('Style profile generated, length:', styleProfile.length, 'preview:', styleProfile.slice(0, 80))
+
           if (styleProfile) {
-            await supabase
+            const { error: updateErr } = await supabase
               .from('designers')
               .update({ ai_style_profile: styleProfile })
               .eq('slug', designer_slug)
+            if (updateErr) console.error('Failed to save ai_style_profile:', updateErr)
+            else console.log('ai_style_profile saved successfully')
+          } else {
+            console.error('Style profile was empty — content type:', result.content[0].type)
           }
         }
       } catch (visionErr) {
         console.error('Claude Vision style analysis failed:', visionErr)
-        // Non-fatal: proceed with complete status, no style profile
+        // Fallback: generate style profile from keywords using Groq (no vision)
+        await groqStyleFallback(designer_slug, designer.style_keywords ?? [])
       }
+    } else {
+      await groqStyleFallback(designer_slug, designer.style_keywords ?? [])
     }
 
     await supabase

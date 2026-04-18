@@ -1,16 +1,21 @@
 # DesignLead — Agent Instructions
 
-You are working on **DesignLead**, a production SaaS built with the WAT architecture (Workflows, Agents, Tools). Read this file at the start of every session to load full project context before touching any code.
+You are working on **DesignLead**, a production SaaS built with the WAT architecture (Workflows, Agents, Tools). Read this file at the start of every session to load full project context before touching any code. Also read `memory.md` for past lessons, external service quirks, and decisions that shouldn't be repeated or reversed.
 
 ---
 
 ## What DesignLead Is
 
-DesignLead is an AI-powered lead qualification and concept visualization tool for freelance interior designers and architects. Homeowners fill out an intake form on the designer's branded page, upload photos of their space, and receive AI-generated render concepts in their designer's aesthetic. The designer receives a qualified lead brief by email and manages their pipeline through a password-protected dashboard.
+DesignLead is an AI-powered lead qualification and client communication tool for freelance interior designers and architects. Homeowners fill out an intake form on the designer's branded page, upload photos of their space, and the designer receives a qualified lead brief plus an AI-drafted response email — ready to review and send directly from the dashboard via a mailto: link. AI-generated concept renders of the client's space are available on the Pro tier.
 
-The product replaces vague "how much does it cost?" inquiries with structured, pre-qualified briefs — and the image renders turn the designer's sales pitch into a visual experience.
+The product replaces vague "how much does it cost?" inquiries with structured, pre-qualified briefs, and automates the slowest part of a designer's day: writing thoughtful, personalized responses to every new lead.
 
-**Business model:** Freemium. Non-paying designers get renders with a watermark overlay. Paying designers get clean renders. Stripe is not yet integrated — `is_paid` is currently set manually in Supabase.
+**Business model:** Fully paid product. No free tier, no watermarks.
+
+- **Base tier** — Intake form, AI lead qualification + brief, AI-drafted response email (language-aware, tone-matched), adaptive questionnaire, automated follow-up sequence, built-in meeting scheduler
+- **Pro tier** — Everything in Base + AI concept renders of the client's space
+
+Stripe is not yet integrated — plan/tier is currently set manually in Supabase via the `is_paid` column, which will be repurposed into a proper `plan_tier` column in a future phase.
 
 ---
 
@@ -29,43 +34,76 @@ Next.js API routes, server actions, utility scripts in `tools/`. Deterministic, 
 
 ---
 
+## Phase Status
+
+- **Phase 1** — Intake form + AI brief + email delivery. COMPLETE
+- **Phase 2** — Photo upload + Claude Vision analysis + designer profiles. COMPLETE
+- **Phase 3** — AI concept renders + dashboard + results page. COMPLETE
+- **Phase 4** — AI-drafted response email (base tier) + free-tier cleanup. COMPLETE
+- **Phase 5** — Adaptive questionnaire (room-type-specific questions). PLANNED
+- **Phase 6** — Automated follow-up sequence (cron-driven nudges). PLANNED
+- **Phase 7** — Built-in meeting scheduler (replaces Calendly dependency). PLANNED
+- **Future** — Stripe integration, multi-language expansion beyond Hungarian
+
+Stay inside the current phase. Do not build ahead.
+
+---
+
 ## Tech Stack (current production state)
 
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript
 - **Styling:** Tailwind CSS — dark luxury palette, see Design System below
 - **Database & Storage:** Supabase (Postgres + Storage), free tier
-- **AI — lead briefs:** Anthropic Claude (primary) + Groq (fast inference fallback)
-- **AI — image generation:** Replicate running ControlNet depth (`jagilley/controlnet-depth`) (~$0.02/render set of 3)
+- **AI — lead briefs and response emails:** Anthropic Claude (`claude-sonnet-4-20250514`)
+- **AI — fast paths:** Groq (used where speed matters more than quality)
+- **AI — image generation:** Replicate running ControlNet depth (`jagilley/controlnet-depth`) (~$0.02/render set of 3). Pro tier only
 - **Email:** Resend (free tier, 3,000/mo) — instant notifications + daily digest via Vercel Cron
+- **Client email sending:** `mailto:` links from dashboard — designer sends from their own email client. No Gmail/Outlook OAuth integration (pragmatic choice, upgradable later)
 - **Deployment:** Vercel Hobby plan — important constraint: 60s max function duration
-- **Cron:** Vercel Cron (free), runs `/api/cron/digest` at 8:00 UTC daily
+- **Cron:** Vercel Cron (free), runs `/api/cron/digest` at 8:00 UTC daily. Phase 6 adds a second cron for follow-up sequences
+
+---
+
+## Language Handling
+
+Current user base is Hungarian. All AI-generated content (briefs, response emails, follow-ups) should detect the client's language from their submitted text and respond in that language. Claude handles this natively. Default fallback when language is ambiguous: Hungarian.
+
+Subject lines and system-generated UI copy for clients use Hungarian templates by default. English templates exist for future expansion but are not actively used yet.
 
 ---
 
 ## API Routes
 
-- `/api/submit` — receives intake form, runs AI lead scoring (Claude + Groq), stores to Supabase, triggers instant email, kicks off render generation as background job
-- `/api/render` — generates 3 concept renders via Replicate ControlNet depth (preserves room geometry from first uploaded photo), stores URLs in Supabase, emails client link to results page. Prompt uses `ai_style_profile` if available, falls back to `style_keywords`
+**Current (Phases 1–3):**
+
+- `/api/submit` — receives intake form, runs AI lead scoring (Claude + Groq), stores to Supabase, triggers instant email, kicks off render generation as background job. Phase 4 adds AI response email draft generation to this route
+- `/api/render` — generates 3 concept renders via Replicate ControlNet depth (preserves room geometry from first uploaded photo), stores URLs in Supabase, emails client link to results page. Prompt uses `ai_style_profile` if available, falls back to `style_keywords`. Pro tier only
 - `/api/scrape-portfolio` — background job triggered after onboarding: fetches designer's portfolio URL, extracts/uploads images to `designer-portfolios` bucket, runs Claude Vision analysis to populate `ai_style_profile`
 - `/api/upload` — handles photo uploads to Supabase Storage (`project-photos` bucket)
 - `/api/dashboard-data` — serves lead data to designer dashboard
-- `/api/onboard` — registers new designer profiles (studio name, style keywords, rates, Calendly URL, notification preference)
+- `/api/onboard` — registers new designer profiles (studio name, style keywords, rates, Calendly URL, notification preference, response tone)
 - `/api/cron/digest` — daily digest for designers with `notification_preference = 'digest'`. Protected by `CRON_SECRET` bearer token
 - `/api/results-data` — serves render results to client via token-gated URL
 - `/api/submissions/[id]/status` — updates lead status from dashboard (New / Contacted / Converted / Not a fit)
+
+**Planned (Phases 5–7):**
+
+- `/api/cron/follow-up` — Phase 6, daily cron that sends nudge emails for stale leads
+- `/api/schedule/request` — Phase 7, client submits proposed meeting times
+- `/api/schedule/confirm` — Phase 7, designer confirms a selected time slot
 
 ## Pages
 
 - `/` — intake form (the main client-facing page, per designer deployment)
 - `/embed` — chromeless version of the intake form for iframe embedding on designer websites
 - `/embed-instructions` — copy-paste iframe snippet for designers
-- `/onboard` — designer signup form (one-time setup)
-- `/dashboard` — password-gated lead management view (metrics + table + status dropdowns + notification settings)
-- `/results/[token]` — client results page showing renders, brief summary, and Calendly CTA
+- `/onboard` — designer signup form (one-time setup). Phase 4 adds `response_tone` field
+- `/dashboard` — password-gated lead management view (metrics + table + status dropdowns + notification settings). Phase 4 adds "Draft response" action per row
+- `/results/[token]` — client results page showing renders, brief summary, and Calendly CTA. Post-Phase-4: watermark logic removed, all results pages render clean
 
 ## Key Components
 
-- `components/IntakeForm.tsx` — the three-section form (Your space / Your vision / Tell us more) with photo upload
+- `components/IntakeForm.tsx` — the three-section form (Your space / Your vision / Tell us more) with mandatory photo upload
 - `components/OnboardForm.tsx` — designer onboarding form
 
 ---
@@ -84,11 +122,12 @@ typical_project_size      text
 rate_range                text
 bio                       text
 calendly_url              text
-is_paid                   boolean default false
-notification_preference   text default 'instant'    -- 'instant' | 'digest'
+is_paid                   boolean default false      -- legacy free/paid flag; will be repurposed into plan_tier in a future phase
+notification_preference   text default 'instant'     -- 'instant' | 'digest'
 portfolio_image_urls      text[]                     -- scraped from portfolio_url, uploaded to designer-portfolios bucket
 ai_style_profile          text                       -- Claude Vision analysis of portfolio images, used as render prompt base
 portfolio_scrape_status   text default 'pending'     -- 'pending' | 'complete' | 'failed'
+response_tone             text                       -- 'warm' | 'professional' | 'enthusiastic', nullable fallback to 'warm and personal'
 created_at                timestamp
 ```
 
@@ -104,11 +143,13 @@ design_style         text
 budget_range         text
 timeline             text
 additional_info      text
-photo_urls           text[]
+photo_urls           text[]                         -- mandatory, min 1 max 3
 ai_brief             text
 lead_quality         text                           -- 'High' | 'Medium' | 'Low'
-render_urls          text[]
-render_status        text default 'pending'         -- 'pending' | 'complete' | 'failed'
+ai_response_draft    text                           -- AI-drafted client response email body, null on generation failure (non-fatal)
+ai_response_subject  text                           -- subject line from hard-coded template; language detected via Hungarian char regex on additional_info
+render_urls          text[]                         -- Pro tier only
+render_status        text default 'pending'         -- 'pending' | 'complete' | 'failed' | 'not_applicable' for base tier
 results_page_token   text                           -- unguessable UUID
 status               text default 'New'             -- 'New' | 'Contacted' | 'Converted' | 'Not a fit'
 created_at           timestamp
@@ -190,11 +231,11 @@ The UI uses the "Obsidian & Champagne" palette — dark, editorial, luxury. Do n
 
 Function duration is capped at 60 seconds. This matters for:
 
-- `/api/submit` — AI call must stay fast. Use Groq for speed-sensitive paths, Claude for quality-sensitive paths
+- `/api/submit` — AI calls must stay fast. Groq handles speed-sensitive paths, Claude handles quality-sensitive paths. Phase 4 adds a second Claude call for response email drafting — must complete inside the same 60s budget as the brief
 - `/api/render` — image generation is the longest operation. Must run as a background fire-and-forget job triggered from `/api/submit`, never blocking the user. Client sees instant thank-you; renders complete asynchronously and results page polls Supabase every 4s
-- Never make the intake form's thank-you screen wait on image generation
+- Never make the intake form's thank-you screen wait on image generation or response email drafting
 
-If a route approaches 60s, something is architecturally wrong — rework it, don't extend it.
+If a route approaches 60s, something is architecturally wrong — rework it, don't extend it. Cron routes for digests and follow-ups have separate timeout budgets but should still be efficient.
 
 ---
 
@@ -204,7 +245,7 @@ If a route approaches 60s, something is architecturally wrong — rework it, don
 Read the relevant files in `app/`, `components/`, or `workflows/` first. Do not duplicate API routes, components, or utility functions.
 
 **2. Preserve working functionality.**
-Phases 1, 2, and 3 are all live. When adding or modifying, never break existing flows: intake → brief → email → render → results page → dashboard. Test the full end-to-end path after any meaningful change.
+All shipped phases are live. When adding or modifying, never break existing flows: intake → brief → response draft → email → render → results page → dashboard. Test the full end-to-end path after any meaningful change.
 
 **3. Stay inside the design system.**
 No new colors, no new fonts, no new border-radius values. If a component needs a new pattern, derive it from the existing tokens.
@@ -212,20 +253,24 @@ No new colors, no new fonts, no new border-radius values. If a component needs a
 **4. Respect the 60s Vercel Hobby limit.**
 Any new long-running work is a background job, not a synchronous call.
 
-**5. Learn from failures — and update workflows.**
+**5. Learn from failures — and update workflows and memory.md.**
 When you hit an error:
 - Read the full stack trace
 - Fix the route or script
 - Retest (if it uses paid APIs — Claude, Replicate — confirm before rerunning repeatedly)
 - Update the relevant workflow in `workflows/` with what you learned (rate limits, timing quirks, unexpected behavior)
+- Add a new entry to `memory.md` if the lesson has long-term value beyond one workflow
 
 Do not create or overwrite workflows without asking unless explicitly told to.
 
 **6. AI prompt discipline.**
-The brief generation prompts and render prompts are defined in workflows. Use them exactly — do not improvise variations. If a prompt needs changing, propose the change first.
+The brief generation prompts, response email prompts, and render prompts are defined in workflows. Use them exactly — do not improvise variations. If a prompt needs changing, propose the change first.
 
 **7. Ask before spending.**
-Any change that would incur non-trivial Replicate, Claude, or Resend costs during testing — pause and confirm with me first.
+Any change that would incur non-trivial Replicate, Claude, or Resend costs during testing — pause and confirm first. Budget is currently tight.
+
+**8. Stay inside the current phase.**
+Phases 5, 6, and 7 are planned but not started. Do not build them speculatively. Phase boundaries exist so each phase can be validated before the next begins.
 
 ---
 
@@ -235,6 +280,8 @@ Any change that would incur non-trivial Replicate, Claude, or Resend costs durin
 .env.local                    # All secrets (gitignored)
 next.config.js                # Contains frame-ancestors CSP for iframe embeds
 vercel.json                   # Cron job config
+CLAUDE.md                     # This file — read at start of every session
+memory.md                     # Long-term lessons, service quirks, locked decisions
 app/
   page.tsx                    # Intake form
   embed/page.tsx              # Chromeless intake form for iframe
@@ -245,6 +292,7 @@ app/
   api/
     submit/route.ts
     render/route.ts
+    scrape-portfolio/route.ts
     upload/route.ts
     onboard/route.ts
     dashboard-data/route.ts
@@ -258,6 +306,7 @@ workflows/
   phase1_intake.md
   phase2_vision.md
   phase3_render.md
+  phase4_response_email.md    # Created during Phase 4 build
   digest_email.md
 tools/                        # Utility scripts
 .tmp/                         # Disposable temporary files
@@ -271,11 +320,11 @@ Every failure is a chance to make the system stronger:
 1. Identify what broke
 2. Fix the route or tool
 3. Verify the fix works end-to-end
-4. Update the workflow with the new approach
+4. Update the workflow with the new approach, and `memory.md` if the lesson has lasting value
 5. Move on with a more robust system
 
 ---
 
 ## Bottom Line
 
-DesignLead is a live product across three phases. Your job is to maintain it, extend it carefully, and keep it honest. Respect the design system, respect the Vercel limits, respect the existing architecture. When in doubt, ask.
+DesignLead is a live paid product across three shipped phases with four more planned. Your job is to maintain it, extend it carefully per the phase roadmap, and keep it honest. Respect the design system, respect the Vercel limits, respect the existing architecture. When in doubt, ask.

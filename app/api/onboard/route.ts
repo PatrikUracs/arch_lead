@@ -13,6 +13,7 @@ type OnboardBody = {
   typicalProjectSize?: string
   ratePerSqm?: string
   bio?: string
+  responseTone?: string
   calendlyUrl?: string
   key: string
 }
@@ -65,6 +66,7 @@ async function handlePost(req: NextRequest) {
         typical_project_size: body.typicalProjectSize?.trim() || null,
         rate_per_sqm: body.ratePerSqm?.trim() || null,
         bio: body.bio?.trim() || null,
+        response_tone: body.responseTone?.trim() || null,
         calendly_url: body.calendlyUrl?.trim() || null,
       },
       { onConflict: 'slug' }

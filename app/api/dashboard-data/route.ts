@@ -17,7 +17,7 @@ export async function GET() {
   const [{ data: submissions }, { data: designer }] = await Promise.all([
     supabase
       .from('submissions')
-      .select('id, created_at, client_name, client_email, room_type, budget_range, lead_quality, status, render_status, results_page_token, brief')
+      .select('id, created_at, client_name, client_email, room_type, budget_range, lead_quality, status, render_status, results_page_token, brief, ai_response_draft, ai_response_subject')
       .eq('designer_slug', slug)
       .order('created_at', { ascending: false }),
     supabase

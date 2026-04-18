@@ -27,6 +27,7 @@ type DesignerProfile = {
   typical_project_size: string | null
   rate_per_sqm: string | null
   bio: string | null
+  response_tone: string | null
 }
 
 const REQUIRED_FIELDS: (keyof Omit<FormBody, 'additionalInfo' | 'photoUrls'>)[] = [
@@ -51,7 +52,7 @@ async function fetchDesignerProfile(): Promise<DesignerProfile | null> {
     )
     const { data, error } = await supabase
       .from('designers')
-      .select('name, studio_name, portfolio_url, style_keywords, typical_project_size, rate_per_sqm, bio')
+      .select('name, studio_name, portfolio_url, style_keywords, typical_project_size, rate_per_sqm, bio, response_tone')
       .eq('slug', slug)
       .single()
 
@@ -116,6 +117,90 @@ Be specific and concise. Maximum 120 words. Do not introduce yourself or add pre
   } catch (err) {
     console.error('Claude Vision error:', err)
     return ''
+  }
+}
+
+/* ── Groq fallback: text-only room assessment ───────────────────── */
+async function analyseRoomPhotosGroqFallback(body: Pick<FormBody, 'roomType' | 'roomSize' | 'designStyle' | 'additionalInfo'>): Promise<string> {
+  if (!process.env.GROQ_API_KEY) return ''
+  try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `An interior designer is reviewing a client inquiry. Room: ${body.roomType}, ${body.roomSize}m², desired style: ${body.designStyle}. Additional notes: ${body.additionalInfo || 'none'}. Write a brief 2-sentence assessment of likely room conditions and key considerations for this project. Be specific and concise.`,
+      }],
+    })
+    return result.choices[0]?.message?.content?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/* ── AI response email draft ────────────────────────────────────── */
+function detectLanguage(text: string): 'hu' | 'en' {
+  if (!text?.trim()) return 'hu'
+  return /[áéíóöőúüű]/i.test(text) ? 'hu' : 'en'
+}
+
+async function generateResponseDraft(
+  body: FormBody,
+  designerProfile: DesignerProfile | null,
+  leadQuality: string | null
+): Promise<{ draft: string | null; subject: string }> {
+  const lang = detectLanguage(body.additionalInfo ?? '')
+  const subject = lang === 'hu'
+    ? `Válasz: A(z) ${body.roomType} projekted`
+    : `Re: Your ${body.roomType} project`
+
+  if (!process.env.ANTHROPIC_API_KEY || !designerProfile) {
+    return { draft: null, subject }
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const tone = designerProfile.response_tone ?? 'warm and personal'
+    const styleKeywords = designerProfile.style_keywords?.join(', ') || 'refined, contemporary'
+    const fullName = designerProfile.name
+    const studioName = designerProfile.studio_name || fullName
+
+    const result = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      system: 'You are drafting a personalized email that an interior designer will send to a potential client who just submitted an inquiry. You are writing as the designer, in first person. The email should feel human, specific to the client\'s project, and match the designer\'s preferred tone. Do not invent facts — only reference details the client actually provided. End with a clear suggested next step. Write in the same language the client used in their inquiry (detect automatically). Hungarian inquiries get Hungarian responses, English gets English, etc.',
+      messages: [
+        {
+          role: 'user',
+          content: `Draft a response email from ${fullName} of ${studioName} to a new client. The client's details:
+Name: ${body.name}
+Room type: ${body.roomType}
+Size: ${body.roomSize} m²
+Style preference: ${body.designStyle}
+Budget: ${body.budgetRange}
+Timeline: ${body.timeline}
+Additional context from client: ${body.additionalInfo?.trim() || 'None'}
+Designer's preferred tone: ${tone}
+Designer's style specialty: ${styleKeywords}
+Lead quality assessment from our system: ${leadQuality ?? 'Unknown'}
+
+Write the response email with:
+- An opening that acknowledges their specific project (room type + style)
+- One sentence showing genuine interest in a specific detail they mentioned
+- Brief indication of next steps (suggest a 20-minute call, or request photos if they haven't been uploaded, or — if lead quality is Low — politely suggest they may be better served by a different type of designer)
+- A warm closing signed off as ${fullName}
+
+Do not include a subject line. Do not include salutation placeholders like [Name] — use the actual name. Do not include any text outside the email body itself. Keep it under 150 words.`,
+        },
+      ],
+    })
+
+    const draft = result.content[0]?.type === 'text' ? result.content[0].text : null
+    return { draft, subject }
+  } catch (err) {
+    console.error('Response draft generation failed:', err)
+    return { draft: null, subject }
   }
 }
 
@@ -214,10 +299,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 1. Run Vision + fetch designer profile in parallel ────────────────────
-  const [roomAssessment, designerProfile] = await Promise.all([
+  const [roomAssessmentRaw, designerProfile] = await Promise.all([
     analyseRoomPhotos(body.photoUrls),
     fetchDesignerProfile(),
   ])
+  const roomAssessment = roomAssessmentRaw || await analyseRoomPhotosGroqFallback(body)
 
   const designerName = designerProfile?.studio_name || designerProfile?.name || process.env.DESIGNER_NAME || 'Your designer'
 
@@ -281,7 +367,12 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
     return NextResponse.json({ error: 'Failed to generate brief' }, { status: 500 })
   }
 
-  // ── 4. Send emails via Resend ─────────────────────────────────────────────
+  // Parse lead quality here so it's available for response draft generation
+  let leadQuality: string | null = null
+  const lqMatch = brief.match(/Lead quality[:\s]+\*{0,2}(High|Medium|Low)\*{0,2}/i)
+  if (lqMatch) leadQuality = lqMatch[1]
+
+  // ── 4. Generate response draft + send designer email in parallel ──────────
   const resend = new Resend(process.env.RESEND_API_KEY)
 
   const roomAssessmentHtml = roomAssessment
@@ -382,17 +473,24 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
 </body>
 </html>`
 
-  try {
-    await resend.emails.send({
+  const [designerEmailResult, responseDraft] = await Promise.allSettled([
+    resend.emails.send({
       from: `${designerName} <onboarding@resend.dev>`,
       to: [designerEmail],
       subject: `New client inquiry — ${body.roomType}, ${body.budgetRange}`,
       html: designerEmailHtml,
-    })
-  } catch (err) {
-    console.error('Resend error (designer email):', err)
+    }),
+    generateResponseDraft(body, designerProfile, leadQuality),
+  ])
+
+  if (designerEmailResult.status === 'rejected') {
+    console.error('Resend error (designer email):', designerEmailResult.reason)
     return NextResponse.json({ error: 'Failed to send designer email' }, { status: 500 })
   }
+
+  const responseDraftData = responseDraft.status === 'fulfilled'
+    ? responseDraft.value
+    : { draft: null, subject: '' }
 
   try {
     await resend.emails.send({
@@ -403,7 +501,6 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
     })
   } catch (err) {
     console.error('Resend error (client email):', err)
-    // Don't fail the whole request if only the client confirmation fails
     console.warn('Client confirmation email failed but designer email was sent successfully')
   }
 
@@ -414,11 +511,6 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     )
-
-    // Parse lead quality from brief (last line: "Lead quality: High/Medium/Low — ...")
-    let leadQuality: string | null = null
-    const match = brief.match(/Lead quality[:\s]+\*{0,2}(High|Medium|Low)\*{0,2}/i)
-    if (match) leadQuality = match[1]
 
     const token = crypto.randomUUID()
 
@@ -437,6 +529,8 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
         photo_urls: body.photoUrls,
         brief,
         lead_quality: leadQuality,
+        ai_response_draft: responseDraftData.draft,
+        ai_response_subject: responseDraftData.subject,
         render_status: 'pending',
         results_page_token: token,
         status: 'New',

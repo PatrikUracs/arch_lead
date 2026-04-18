@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   // Fetch designer (only safe public fields)
   const { data: designer } = await supabase
     .from('designers')
-    .select('name, studio_name, calendly_url, is_paid')
+    .select('name, studio_name, calendly_url')
     .eq('slug', submission.designer_slug)
     .single()
 

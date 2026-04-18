@@ -143,8 +143,17 @@ The intake form always returns success before renders are complete. This is not 
 **Token-gated results page**
 Results are accessed via a UUID token generated at submission time and stored in `results_page_token`. There is no login, no account, and no way to look up results without the token. This keeps the client experience frictionless. The token is sent to the client via email — if the email fails, the client has no way to access their results.
 
-**Watermark for free tier**
-The `is_paid` boolean on the designer record controls whether the `Watermark` component renders over each image on the results page. This is the only enforcement mechanism — there is no server-side image watermarking. A determined user can access the unwatermarked image URL directly. This is an acceptable tradeoff for a freemium MVP.
+**Watermark removed — product is now fully paid**
+The freemium model and `Watermark` component were removed in Phase 4. DesignLead is now a fully paid product with Base and Pro tiers. The `is_paid` column remains in the `designers` table for future repurposing as `plan_tier` (base vs pro). The `Watermark` React component and all `is_paid` conditional rendering have been deleted from `app/results/[token]/page.tsx` and `app/api/results-data/route.ts`. Do not re-introduce watermark logic.
+
+**AI-drafted response emails — mailto: approach chosen over direct sending**
+Phase 4 adds an AI-drafted response email per submission, surfaced in the dashboard via a "Draft response" modal. The designer sends it via a `mailto:` link that opens their default email client with subject, recipient, and body pre-filled — they send from their own email address. Direct sending via Resend or Gmail/Outlook OAuth was rejected: `mailto:` requires zero new integrations, keeps the designer's email identity intact, and is upgradable to direct API sending in a later phase. Subject line is hard-coded (no extra API call): Hungarian if `additional_info` matches `/[áéíóöőúüű]/i` or is empty, English otherwise.
+
+**Response email generation runs in parallel with designer notification email**
+In `app/api/submit/route.ts`, `generateResponseDraft()` and `resend.emails.send()` (designer email) are called via `Promise.allSettled()`. This saves ~3s per submission. The draft call is non-fatal: if it fails, `ai_response_draft` is stored as null and the dashboard simply omits the "Draft response" button for that submission.
+
+**`response_tone` fallback is 'warm and personal' for existing designers**
+The `generateResponseDraft()` function falls back to `'warm and personal'` when `designerProfile.response_tone` is null. Existing designers onboarded before Phase 4 have no `response_tone` set and will silently receive this default. The onboard form now captures this field as a required radio selection for new designers.
 
 **Single-tenant deployment model**
 Each designer runs their own Vercel deployment with their own set of environment variables. There is no shared user database, no login system, and no multi-tenant routing. Expanding to multi-tenant would require significant architectural changes and should not be attempted incrementally.
