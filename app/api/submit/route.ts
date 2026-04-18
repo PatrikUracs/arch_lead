@@ -473,7 +473,7 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
 </body>
 </html>`
 
-  const [designerEmailResult, responseDraft] = await Promise.allSettled([
+  const [designerEmailResult, responseDraft, clientEmailResult] = await Promise.allSettled([
     resend.emails.send({
       from: `${designerName} <onboarding@resend.dev>`,
       to: [designerEmail],
@@ -481,6 +481,12 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
       html: designerEmailHtml,
     }),
     generateResponseDraft(body, designerProfile, leadQuality),
+    resend.emails.send({
+      from: `${designerName} <onboarding@resend.dev>`,
+      to: [body.email],
+      subject: `We received your inquiry — ${designerName}`,
+      html: clientEmailHtml,
+    }),
   ])
 
   if (designerEmailResult.status === 'rejected') {
@@ -488,21 +494,13 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
     return NextResponse.json({ error: 'Failed to send designer email' }, { status: 500 })
   }
 
+  if (clientEmailResult.status === 'rejected') {
+    console.error('Resend error (client email):', clientEmailResult.reason)
+  }
+
   const responseDraftData = responseDraft.status === 'fulfilled'
     ? responseDraft.value
     : { draft: null, subject: '' }
-
-  try {
-    await resend.emails.send({
-      from: `${designerName} <onboarding@resend.dev>`,
-      to: [body.email],
-      subject: `We received your inquiry — ${designerName}`,
-      html: clientEmailHtml,
-    })
-  } catch (err) {
-    console.error('Resend error (client email):', err)
-    console.warn('Client confirmation email failed but designer email was sent successfully')
-  }
 
   // ── 5. Log submission to Supabase + trigger background render ─────────────
   const slug = process.env.NEXT_PUBLIC_DESIGNER_SLUG
