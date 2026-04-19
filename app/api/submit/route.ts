@@ -342,8 +342,47 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
   const lqMatch = brief.match(/Lead quality[:\s]+\*{0,2}(High|Medium|Low)\*{0,2}/i)
   if (lqMatch) leadQuality = lqMatch[1]
 
-  // ── 4. Generate response draft + send emails in parallel ────────
+  // ── 4. Generate response draft (non-fatal, before insert so draft is persisted) ──
+  const responseDraftData = await generateResponseDraft(body, designerRow, leadQuality)
+    .catch(() => ({ draft: null, subject: '' }))
+
+  // ── 5. Insert submission — photos are already uploaded; record must exist before emails ──
+  const token = crypto.randomUUID()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+
+  const { data: submission, error: insertError } = await supabase
+    .from('submissions')
+    .insert({
+      designer_slug: designerRow.slug,
+      client_name: body.name,
+      client_email: body.email,
+      room_type: body.roomType,
+      room_size: body.roomSize,
+      design_style: body.designStyle,
+      budget_range: body.budgetRange,
+      timeline: body.timeline,
+      additional_info: body.additionalInfo || null,
+      photo_urls: body.photoUrls,
+      brief,
+      lead_quality: leadQuality,
+      ai_response_draft: responseDraftData.draft,
+      ai_response_subject: responseDraftData.subject,
+      // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
+      render_status: RENDERS_ENABLED && designerRow.is_paid ? 'pending' : 'not_applicable',
+      results_page_token: token,
+      status: 'New',
+    })
+    .select('id, results_page_token')
+    .single()
+
+  if (insertError || !submission) {
+    console.error('Submission insert error:', insertError)
+    return NextResponse.json({ error: 'Failed to save submission' }, { status: 500 })
+  }
+
+  // ── 6. Send emails — best-effort, non-fatal after DB record exists ──
   const resend = new Resend(process.env.RESEND_API_KEY)
+  const dashboardUrl = `${appUrl}/dashboard/${designerRow.slug}`
 
   const roomAssessmentHtml = roomAssessment
     ? `<div style="margin:24px 0;padding:20px;background:#f0f9f9;border-radius:6px;border-left:3px solid #376E6F;">
@@ -351,9 +390,6 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
   <p style="margin:0;font-size:13px;line-height:1.7;color:#333;">${roomAssessment.replace(/\n/g, '<br/>')}</p>
 </div>`
     : ''
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  const dashboardUrl = `${appUrl}/dashboard/${designerRow.slug}`
 
   const designerEmailHtml = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/></head>
@@ -422,14 +458,15 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
   </div>
 </body></html>`
 
-  const [designerEmailResult, responseDraft, clientEmailResult] = await Promise.allSettled([
+  // Emails are best-effort: submission is already persisted, so failures don't orphan data.
+  // TODO(Item 6): replace console.error with logError() from lib/errorLog.ts
+  const [designerEmailResult, clientEmailResult] = await Promise.allSettled([
     resend.emails.send({
       from: `${designerName} <onboarding@resend.dev>`,
       to: [designerEmail],
       subject: `New client inquiry — ${body.roomType}, ${body.budgetRange}`,
       html: designerEmailHtml,
     }),
-    generateResponseDraft(body, designerRow, leadQuality),
     resend.emails.send({
       from: `${designerName} <onboarding@resend.dev>`,
       to: [body.email],
@@ -440,47 +477,14 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
 
   if (designerEmailResult.status === 'rejected') {
     console.error('Resend error (designer email):', designerEmailResult.reason)
-    return NextResponse.json({ error: 'Failed to send designer email' }, { status: 500 })
   }
-
   if (clientEmailResult.status === 'rejected') {
     console.error('Resend error (client email):', clientEmailResult.reason)
   }
 
-  const responseDraftData = responseDraft.status === 'fulfilled'
-    ? responseDraft.value
-    : { draft: null, subject: '' }
-
-  // ── 5. Log submission + trigger render if Pro ───────────────────
-  const token = crypto.randomUUID()
-
-  const { data: submission, error: insertError } = await supabase
-    .from('submissions')
-    .insert({
-      designer_slug: designerRow.slug,
-      client_name: body.name,
-      client_email: body.email,
-      room_type: body.roomType,
-      room_size: body.roomSize,
-      design_style: body.designStyle,
-      budget_range: body.budgetRange,
-      timeline: body.timeline,
-      additional_info: body.additionalInfo || null,
-      photo_urls: body.photoUrls,
-      brief,
-      lead_quality: leadQuality,
-      ai_response_draft: responseDraftData.draft,
-      ai_response_subject: responseDraftData.subject,
-      // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
-      render_status: RENDERS_ENABLED && designerRow.is_paid ? 'pending' : 'not_applicable',
-      results_page_token: token,
-      status: 'New',
-    })
-    .select('id, results_page_token')
-    .single()
-
+  // ── 7. Trigger render if Pro and renders enabled ────────────────
   // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
-  if (!insertError && submission && RENDERS_ENABLED && designerRow.is_paid && appUrl) {
+  if (RENDERS_ENABLED && designerRow.is_paid && appUrl) {
     waitUntil(
       fetch(`${appUrl}/api/render`, {
         method: 'POST',
