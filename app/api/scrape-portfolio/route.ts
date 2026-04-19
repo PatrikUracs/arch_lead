@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
+import { verifyInternalAuth } from '@/lib/internalAuth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -83,6 +84,10 @@ async function groqStyleFallback(designer_slug: string, styleKeywords: string[])
 }
 
 export async function POST(req: NextRequest) {
+  if (!verifyInternalAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   let designer_slug: string
   try {
     const body = await req.json()
@@ -110,6 +115,7 @@ export async function POST(req: NextRequest) {
       .from('designers')
       .select('portfolio_url, style_keywords')
       .eq('slug', designer_slug)
+      .is('archived_at', null)
       .single()
 
     if (designerErr || !designer?.portfolio_url) {

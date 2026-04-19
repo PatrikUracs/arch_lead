@@ -1,3 +1,6 @@
+// TODO: When rendering is re-enabled, add verifyInternalAuth(req) as the first check in the POST
+// handler using lib/internalAuth.ts, and use WEBHOOK_SECRET (not CRON_SECRET) passed as a path
+// segment (e.g. /api/render-webhook/[secret]) for Replicate webhook validation.
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
 import { createClient } from '@supabase/supabase-js'
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
     .from('submissions')
     .select('id, designer_slug, client_email, client_name, room_type, design_style, photo_urls, brief, results_page_token')
     .eq('id', submissionId)
+    .is('archived_at', null)
     .single()
 
   if (subErr || !submission) {
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
     .from('designers')
     .select('name, studio_name, style_keywords, ai_style_profile, calendly_url, is_paid')
     .eq('slug', submission.designer_slug)
+    .is('archived_at', null)
     .single()
 
   const styleKeywords: string[] = designer?.style_keywords ?? []

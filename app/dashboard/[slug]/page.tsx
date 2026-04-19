@@ -146,6 +146,7 @@ function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => vo
     setLoading(false)
     if (data.ok) {
       sessionStorage.setItem(`designlead_auth_${slug}`, 'true')
+      sessionStorage.setItem(`designlead_pw_${slug}`, password)
       onSuccess()
     } else {
       setError('Incorrect password')
@@ -260,6 +261,7 @@ export default function DashboardPage() {
 
   function logout() {
     sessionStorage.removeItem(`designlead_auth_${slug}`)
+    sessionStorage.removeItem(`designlead_pw_${slug}`)
     window.location.reload()
   }
 
@@ -288,7 +290,8 @@ export default function DashboardPage() {
 
   async function updateNotifPref(pref: 'instant' | 'digest') {
     setNotifPref(pref)
-    await fetch('/api/designer-settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notificationPreference: pref, slug }) })
+    const password = sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
+    await fetch('/api/designer-settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notificationPreference: pref, slug, password }) })
   }
 
   if (checking) return null

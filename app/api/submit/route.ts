@@ -484,7 +484,10 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
     waitUntil(
       fetch(`${appUrl}/api/render`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET ?? '',
+        },
         body: JSON.stringify({ submissionId: submission.id }),
       })
         .then(r => console.log('Render trigger response:', r.status))
