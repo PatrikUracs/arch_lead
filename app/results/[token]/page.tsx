@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { RENDERS_ENABLED } from '@/lib/flags'
 
 type SubmissionData = {
   id: string
@@ -147,9 +148,9 @@ export default function ResultsPage() {
     fetchData()
   }, [fetchData])
 
-  // Poll while pending
+  // Poll while pending — RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
   useEffect(() => {
-    if (!data || data.submission.render_status !== 'pending') return
+    if (!RENDERS_ENABLED || !data || data.submission.render_status !== 'pending') return
     const id = setInterval(fetchData, 4000)
     return () => clearInterval(id)
   }, [data, fetchData])
@@ -198,7 +199,8 @@ export default function ResultsPage() {
   }
 
   /* ── Loading (no data yet or pending) ──────────────────────────── */
-  if (!data || data.submission.render_status === 'pending') {
+  // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
+  if (!data || (RENDERS_ENABLED && data.submission.render_status === 'pending')) {
     const designerName = data?.designer?.name ?? ''
     return (
       <div style={bgStyle} className="flex items-center justify-center px-4 py-16">
@@ -237,7 +239,8 @@ export default function ResultsPage() {
   }
 
   /* ── Failed ──────────────────────────────────────────────────── */
-  if (data.submission.render_status === 'failed') {
+  // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
+  if (RENDERS_ENABLED && data.submission.render_status === 'failed') {
     const dn = data.designer?.name ?? 'The designer'
     return (
       <div style={bgStyle} className="flex items-center justify-center px-4 py-16">
@@ -336,8 +339,8 @@ export default function ResultsPage() {
           </p>
         </div>
 
-        {/* Image grid */}
-        {renderUrls.length > 0 && (
+        {/* Image grid — RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X) */}
+        {RENDERS_ENABLED && renderUrls.length > 0 && (
           <div
             style={{
               display: 'grid',
@@ -365,6 +368,12 @@ export default function ResultsPage() {
                 />
               </div>
             ))}
+          </div>
+        )}
+        {!RENDERS_ENABLED && (
+          <div style={{ background: '#111111', border: '1px solid rgba(201,169,110,0.15)', borderRadius: 2, padding: '40px 32px', textAlign: 'center', marginBottom: 48 }}>
+            <p style={{ fontFamily: 'var(--font-playfair)', fontSize: 18, fontWeight: 400, color: 'rgba(245,240,232,0.5)', margin: '0 0 10px' }}>Concept renders</p>
+            <p style={{ fontFamily: 'var(--font-montserrat)', fontWeight: 200, fontSize: 12, color: 'rgba(245,240,232,0.3)', letterSpacing: '0.08em', margin: 0 }}>This feature is coming soon.</p>
           </div>
         )}
 
