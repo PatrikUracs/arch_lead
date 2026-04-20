@@ -39,6 +39,23 @@ export default function RootPage() {
           background: linear-gradient(90deg, rgba(184,147,90,0.4) 0%, transparent 70%);
           margin-bottom: 2.5rem;
         }
+        .nav-cta {
+          font-family: Montserrat, sans-serif;
+          font-weight: 400;
+          font-size: 0.8125rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #FFEAAA;
+          border: 1px solid rgba(255,234,170,0.4);
+          border-radius: 2px;
+          padding: 0.5rem 1.25rem;
+          text-decoration: none;
+          transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .nav-cta:hover {
+          border-color: #FFEAAA;
+          background: rgba(255,234,170,0.08);
+        }
       `}</style>
 
       <div className="landing-body">
@@ -57,30 +74,7 @@ export default function RootPage() {
           <span className="playfair" style={{ fontSize: '1.375rem', color: '#FFEAAA', letterSpacing: '0.02em' }}>
             DesignLead
           </span>
-          <Link
-            href="/onboard"
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 400,
-              fontSize: '0.8125rem',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: '#FFEAAA',
-              border: '1px solid rgba(255,234,170,0.4)',
-              borderRadius: '2px',
-              padding: '0.5rem 1.25rem',
-              textDecoration: 'none',
-              transition: 'border-color 0.2s ease, background 0.2s ease',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#FFEAAA'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,234,170,0.08)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,234,170,0.4)'
-              ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
-            }}
-          >
+          <Link href="/onboard" className="nav-cta">
             Regisztráció
           </Link>
         </nav>
