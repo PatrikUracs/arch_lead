@@ -5,6 +5,8 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { waitUntil } from '@vercel/functions'
 import { RENDERS_ENABLED } from '@/lib/flags'
+import { htmlEscape, isPro } from '@/lib/utils'
+import { logError } from '@/lib/errorLog'
 
 export const runtime = 'nodejs'
 
@@ -17,7 +19,7 @@ type FormBody = {
   budgetRange: string
   timeline: string
   additionalInfo?: string
-  photoUrls: string[]
+  photoPaths: string[]
   designer_slug: string
 }
 
@@ -37,9 +39,11 @@ type DesignerRow = {
   calendly_url: string | null
 }
 
-const REQUIRED_FIELDS: (keyof Omit<FormBody, 'additionalInfo' | 'photoUrls' | 'designer_slug'>)[] = [
+const REQUIRED_FIELDS: (keyof Omit<FormBody, 'additionalInfo' | 'photoPaths' | 'designer_slug'>)[] = [
   'name', 'email', 'roomType', 'roomSize', 'designStyle', 'budgetRange', 'timeline',
 ]
+
+const SIGNED_URL_TTL = 86400 // 24 h — enough for Vision + email photo links
 
 /* ── Download image and base64-encode it ───────────────────────── */
 async function imageUrlToBase64(
@@ -175,10 +179,11 @@ function briefToHtml(brief: string): string {
     .map((line) => {
       const trimmed = line.trim()
       if (!trimmed) return '<br/>'
+      const escaped = htmlEscape(trimmed)
       if (/^\d+\)/.test(trimmed)) {
-        return `<h3 style="margin:18px 0 6px;font-size:15px;font-weight:600;color:#111;">${trimmed}</h3>`
+        return `<h3 style="margin:18px 0 6px;font-size:15px;font-weight:600;color:#111;">${escaped}</h3>`
       }
-      const formatted = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      const formatted = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       return `<p style="margin:0 0 8px;line-height:1.6;color:#333;">${formatted}</p>`
     })
     .join('\n')
@@ -186,14 +191,14 @@ function briefToHtml(brief: string): string {
 
 function rawAnswersHtml(body: FormBody): string {
   const rows = [
-    ['Name', body.name],
-    ['Email', body.email],
-    ['Room type', body.roomType],
-    ['Room size', `${body.roomSize} m²`],
-    ['Design style', body.designStyle],
-    ['Budget range', body.budgetRange],
-    ['Timeline', body.timeline],
-    ['Additional info', body.additionalInfo || '—'],
+    ['Name', htmlEscape(body.name)],
+    ['Email', htmlEscape(body.email)],
+    ['Room type', htmlEscape(body.roomType)],
+    ['Room size', `${htmlEscape(String(body.roomSize))} m²`],
+    ['Design style', htmlEscape(body.designStyle)],
+    ['Budget range', htmlEscape(body.budgetRange)],
+    ['Timeline', htmlEscape(body.timeline)],
+    ['Additional info', body.additionalInfo ? htmlEscape(body.additionalInfo) : '—'],
   ]
   return rows.map(([label, value]) =>
     `<tr>
@@ -240,7 +245,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid room size' }, { status: 400 })
   }
 
-  if (!Array.isArray(body.photoUrls) || body.photoUrls.length === 0) {
+  if (!Array.isArray(body.photoPaths) || body.photoPaths.length === 0) {
     return NextResponse.json({ error: 'At least one photo is required' }, { status: 400 })
   }
 
@@ -280,8 +285,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
 
-  // ── 1. Run Vision + designer profile in parallel ────────────────
-  const roomAssessmentRaw = await analyseRoomPhotos(body.photoUrls)
+  // ── 1a. Generate fresh signed URLs from stored paths ───────────
+  const signedUrlResults = await Promise.all(
+    body.photoPaths.map((path) =>
+      supabase.storage.from('room-photos').createSignedUrl(path, SIGNED_URL_TTL)
+    )
+  )
+  const photoSignedUrls = signedUrlResults
+    .map((r) => r.data?.signedUrl)
+    .filter(Boolean) as string[]
+
+  // ── 1b. Run Vision + designer profile in parallel ───────────────
+  const roomAssessmentRaw = await analyseRoomPhotos(photoSignedUrls)
   const roomAssessment = roomAssessmentRaw || await analyseRoomPhotosGroqFallback(body)
 
   // ── 2. Build designer context for Groq prompt ───────────────────
@@ -362,13 +377,13 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
       budget_range: body.budgetRange,
       timeline: body.timeline,
       additional_info: body.additionalInfo || null,
-      photo_urls: body.photoUrls,
+      photo_urls: body.photoPaths,
       brief,
       lead_quality: leadQuality,
       ai_response_draft: responseDraftData.draft,
       ai_response_subject: responseDraftData.subject,
       // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
-      render_status: RENDERS_ENABLED && designerRow.is_paid ? 'pending' : 'not_applicable',
+      render_status: RENDERS_ENABLED && isPro(designerRow) ? 'pending' : 'not_applicable',
       results_page_token: token,
       status: 'New',
     })
@@ -387,7 +402,7 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
   const roomAssessmentHtml = roomAssessment
     ? `<div style="margin:24px 0;padding:20px;background:#f0f9f9;border-radius:6px;border-left:3px solid #376E6F;">
   <h3 style="margin:0 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#376E6F;">Room assessment (Claude Vision)</h3>
-  <p style="margin:0;font-size:13px;line-height:1.7;color:#333;">${roomAssessment.replace(/\n/g, '<br/>')}</p>
+  <p style="margin:0;font-size:13px;line-height:1.7;color:#333;">${htmlEscape(roomAssessment).replace(/\n/g, '<br/>')}</p>
 </div>`
     : ''
 
@@ -396,14 +411,14 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f9f9f9;margin:0;padding:24px;">
   <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
     <div style="background:#111;padding:24px 32px;">
-      <h1 style="color:#fff;margin:0;font-size:18px;font-weight:600;">${designerName}</h1>
+      <h1 style="color:#fff;margin:0;font-size:18px;font-weight:600;">${htmlEscape(designerName)}</h1>
       <p style="color:#aaa;margin:4px 0 0;font-size:13px;">New client inquiry</p>
     </div>
     <div style="padding:32px;">
       <h2 style="font-size:20px;font-weight:700;color:#111;margin:0 0 20px;">AI-Generated Project Brief</h2>
       ${briefToHtml(brief)}
       ${roomAssessmentHtml}
-      ${photoLinksHtml(body.photoUrls)}
+      ${photoLinksHtml(photoSignedUrls)}
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0;"/>
       <h2 style="font-size:16px;font-weight:700;color:#111;margin:0 0 16px;">Raw Form Answers</h2>
       <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:6px;overflow:hidden;">
@@ -424,42 +439,41 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f9f9f9;margin:0;padding:24px;">
   <div style="max-width:580px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
     <div style="background:#111;padding:24px 32px;">
-      <h1 style="color:#fff;margin:0;font-size:18px;font-weight:600;">${designerName}</h1>
+      <h1 style="color:#fff;margin:0;font-size:18px;font-weight:600;">${htmlEscape(designerName)}</h1>
       <p style="color:#aaa;margin:4px 0 0;font-size:13px;">Thoughtful spaces for modern living</p>
     </div>
     <div style="padding:32px;">
-      <p style="font-size:16px;color:#111;margin:0 0 16px;">Hi ${body.name},</p>
+      <p style="font-size:16px;color:#111;margin:0 0 16px;">Hi ${htmlEscape(body.name)},</p>
       <p style="font-size:14px;color:#444;line-height:1.7;margin:0 0 20px;">
-        Thank you for reaching out to ${designerName}. We've received your inquiry and will review it shortly.
+        Thank you for reaching out to ${htmlEscape(designerName)}. We've received your inquiry and will review it shortly.
       </p>
       <div style="background:#f9fafb;border-radius:6px;padding:20px;margin-bottom:24px;">
         <h3 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:0 0 14px;">What you submitted</h3>
         <table style="width:100%;border-collapse:collapse;">
           <tbody>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;width:40%;">Room type</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.roomType}</td></tr>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Room size</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.roomSize} m²</td></tr>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Design style</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.designStyle}</td></tr>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Budget range</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.budgetRange}</td></tr>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Timeline</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.timeline}</td></tr>
-            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Photos uploaded</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.photoUrls.length}</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;width:40%;">Room type</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${htmlEscape(body.roomType)}</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Room size</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${htmlEscape(String(body.roomSize))} m²</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Design style</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${htmlEscape(body.designStyle)}</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Budget range</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${htmlEscape(body.budgetRange)}</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Timeline</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${htmlEscape(body.timeline)}</td></tr>
+            <tr><td style="padding:5px 0;font-size:13px;color:#6b7280;">Photos uploaded</td><td style="padding:5px 0;font-size:13px;color:#111;font-weight:500;">${body.photoPaths.length}</td></tr>
           </tbody>
         </table>
       </div>
       <p style="font-size:14px;color:#444;line-height:1.7;margin:0 0 8px;">
-        ${designerName.split(' ')[0]} will personally review your project details and be in touch within <strong>2 business days</strong>.
+        ${htmlEscape(designerName.split(' ')[0])} will personally review your project details and be in touch within <strong>2 business days</strong>.
       </p>
       <p style="font-size:14px;color:#444;line-height:1.7;margin:0;">
         In the meantime, feel free to reply to this email with any questions.
       </p>
     </div>
     <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">${designerName} · Interior Design</p>
+      <p style="margin:0;font-size:12px;color:#9ca3af;">${htmlEscape(designerName)} · Interior Design</p>
     </div>
   </div>
 </body></html>`
 
   // Emails are best-effort: submission is already persisted, so failures don't orphan data.
-  // TODO(Item 6): replace console.error with logError() from lib/errorLog.ts
   const [designerEmailResult, clientEmailResult] = await Promise.allSettled([
     resend.emails.send({
       from: `${designerName} <onboarding@resend.dev>`,
@@ -476,15 +490,15 @@ End with a "Lead quality" line: rate it High / Medium / Low with one sentence of
   ])
 
   if (designerEmailResult.status === 'rejected') {
-    console.error('Resend error (designer email):', designerEmailResult.reason)
+    void logError('submit/designer-email', designerEmailResult.reason, { designer_slug: designerRow.slug })
   }
   if (clientEmailResult.status === 'rejected') {
-    console.error('Resend error (client email):', clientEmailResult.reason)
+    void logError('submit/client-email', clientEmailResult.reason, { designer_slug: designerRow.slug })
   }
 
   // ── 7. Trigger render if Pro and renders enabled ────────────────
   // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
-  if (RENDERS_ENABLED && designerRow.is_paid && appUrl) {
+  if (RENDERS_ENABLED && isPro(designerRow) && appUrl) {
     waitUntil(
       fetch(`${appUrl}/api/render`, {
         method: 'POST',

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { htmlEscape } from '@/lib/utils'
+import { logError } from '@/lib/errorLog'
 
 export const runtime = 'nodejs'
 
@@ -18,28 +20,23 @@ type Designer = {
   slug: string
   name: string
   studio_name: string | null
-  email?: string
+  email: string | null
   notification_preference: string
 }
 
 function qualityLabel(q: string | null) {
-  if (!q) return ''
-  return q
+  return q ?? ''
 }
 
 function buildDigestHtml(designer: Designer, submissions: Submission[], dashboardUrl: string): string {
   const studioName = designer.studio_name || designer.name
-  const rows = submissions
-    .map(
-      (s) => `
+  const rows = submissions.map((s) => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:#F5F0E8;font-size:13px;">${s.client_name}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:rgba(245,240,232,0.6);font-size:13px;">${s.room_type}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:rgba(245,240,232,0.6);font-size:13px;">${s.budget_range}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:#C9A96E;font-size:12px;font-weight:300;">${qualityLabel(s.lead_quality)}</td>
-      </tr>`
-    )
-    .join('')
+        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:#F5F0E8;font-size:13px;">${htmlEscape(s.client_name)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:rgba(245,240,232,0.6);font-size:13px;">${htmlEscape(s.room_type)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:rgba(245,240,232,0.6);font-size:13px;">${htmlEscape(s.budget_range)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #1E1E1E;color:#C9A96E;font-size:12px;font-weight:300;">${htmlEscape(qualityLabel(s.lead_quality))}</td>
+      </tr>`).join('')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -69,7 +66,7 @@ function buildDigestHtml(designer: Designer, submissions: Submission[], dashboar
       </div>
     </div>
     <div style="padding:16px 40px 20px;border-top:1px solid rgba(201,169,110,0.08);">
-      <p style="margin:0;font-size:11px;color:rgba(245,240,232,0.25);">Daily digest from DesignLead · You&rsquo;re receiving this because your notification preference is set to daily.</p>
+      <p style="margin:0;font-size:11px;color:rgba(245,240,232,0.25);">Daily digest from DesignLead &middot; You&rsquo;re receiving this because your notification preference is set to daily.</p>
     </div>
   </div>
 </body>
@@ -77,7 +74,6 @@ function buildDigestHtml(designer: Designer, submissions: Submission[], dashboar
 }
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -98,18 +94,17 @@ export async function GET(req: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
-  // Query submissions from last 24 hours
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { data: submissions } = await supabase
     .from('submissions')
     .select('id, client_name, room_type, budget_range, lead_quality, designer_slug, results_page_token')
     .gte('created_at', since)
+    .is('archived_at', null)
 
   if (!submissions || submissions.length === 0) {
     return NextResponse.json({ sent: 0 })
   }
 
-  // Group by designer_slug
   const byDesigner: Record<string, Submission[]> = {}
   for (const s of submissions) {
     if (!byDesigner[s.designer_slug]) byDesigner[s.designer_slug] = []
@@ -119,35 +114,48 @@ export async function GET(req: NextRequest) {
   const slugs = Object.keys(byDesigner)
   const { data: designers } = await supabase
     .from('designers')
-    .select('slug, name, studio_name, notification_preference')
+    .select('slug, name, studio_name, email, notification_preference')
     .in('slug', slugs)
+    .is('archived_at', null)
 
   if (!designers) return NextResponse.json({ sent: 0 })
 
   let sent = 0
-  const designerEmail = process.env.DESIGNER_EMAIL
 
-  for (const designer of designers) {
+  for (const designer of designers as Designer[]) {
     if (designer.notification_preference !== 'digest') continue
-    if (!designerEmail) continue
+    if (!designer.email) {
+      console.warn(`Digest skipped for ${designer.slug} — no email on file`)
+      continue
+    }
 
     const subs = byDesigner[designer.slug] ?? []
     if (subs.length === 0) continue
 
-    const html = buildDigestHtml(designer as Designer, subs, `${appUrl}/dashboard`)
+    const dashboardUrl = `${appUrl}/dashboard/${designer.slug}`
+    const html = buildDigestHtml(designer, subs, dashboardUrl)
     const studioName = designer.studio_name || designer.name
 
     try {
       await resend.emails.send({
         from: `${studioName} <onboarding@resend.dev>`,
-        to: [designerEmail],
+        to: [designer.email],
         subject: `${subs.length} new lead${subs.length !== 1 ? 's' : ''} today — ${studioName}`,
         html,
       })
       sent++
     } catch (err) {
-      console.error(`Digest email failed for ${designer.slug}:`, err)
+      void logError('cron/digest', err, { designer_slug: designer.slug })
     }
+  }
+
+  try {
+    await supabase.from('admin_actions').insert({
+      action_type: 'cron_digest_completed',
+      details: { designers_emailed: sent, submissions_included: submissions.length },
+    })
+  } catch (err) {
+    console.error('Failed to log cron completion:', err)
   }
 
   return NextResponse.json({ sent })

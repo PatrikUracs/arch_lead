@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge'
-
 type WindowEntry = { count: number; resetAt: number }
 
 // In-memory rate limiter — suitable for low traffic. Upgrade to Upstash Redis after May 2026.

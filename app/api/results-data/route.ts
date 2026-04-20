@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     .from('submissions')
     .select('id, render_status, render_urls, room_type, design_style, brief, designer_slug, results_page_token')
     .eq('results_page_token', token)
+    .is('archived_at', null)
     .single()
 
   if (error || !submission) {
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
     .from('designers')
     .select('name, studio_name, calendly_url')
     .eq('slug', submission.designer_slug)
+    .is('archived_at', null)
     .single()
 
   return NextResponse.json({

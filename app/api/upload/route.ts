@@ -5,7 +5,6 @@ export const runtime = 'nodejs'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5 MB
-const SIGNED_URL_TTL = 86400 // 24 hours — enough for Vision + email viewing
 
 export async function POST(req: NextRequest) {
   let formData: FormData
@@ -49,11 +48,11 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  const signedUrls: string[] = []
+  const paths: string[] = []
 
   for (const file of files) {
     const ext = file.name.split('.').pop() ?? 'jpg'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = `submissions/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`
 
     const bytes = await file.arrayBuffer()
     const { error: uploadError } = await supabase.storage
@@ -65,17 +64,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to upload photo. Please try again.' }, { status: 500 })
     }
 
-    const { data: urlData, error: urlError } = await supabase.storage
-      .from('room-photos')
-      .createSignedUrl(path, SIGNED_URL_TTL)
-
-    if (urlError || !urlData) {
-      console.error('Supabase signed URL error:', urlError)
-      return NextResponse.json({ error: 'Failed to process photo. Please try again.' }, { status: 500 })
-    }
-
-    signedUrls.push(urlData.signedUrl)
+    paths.push(path)
   }
 
-  return NextResponse.json({ urls: signedUrls })
+  return NextResponse.json({ paths })
 }

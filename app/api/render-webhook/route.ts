@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { htmlEscape } from '@/lib/utils'
+import { logError } from '@/lib/errorLog'
 
 export const runtime = 'nodejs'
 
@@ -44,17 +46,17 @@ async function sendResultsEmail(params: {
   <div style="max-width:580px;margin:0 auto;background:#111111;border-radius:2px;overflow:hidden;border:1px solid rgba(201,169,110,0.2);">
     <div style="padding:40px 40px 0;">
       <h1 style="font-family:Georgia,serif;font-size:28px;font-weight:400;color:#F5F0E8;margin:0 0 8px;letter-spacing:0.02em;">Your concept is ready.</h1>
-      <p style="color:rgba(245,240,232,0.5);font-size:13px;font-weight:300;margin:0 0 32px;letter-spacing:0.05em;">${params.studioName}</p>
+      <p style="color:rgba(245,240,232,0.5);font-size:13px;font-weight:300;margin:0 0 32px;letter-spacing:0.05em;">${htmlEscape(params.studioName)}</p>
       <hr style="border:none;border-top:1px solid rgba(201,169,110,0.15);margin:0 0 32px;"/>
       <p style="color:rgba(245,240,232,0.7);font-size:14px;line-height:1.7;margin:0 0 32px;">
-        We&rsquo;ve prepared concept directions for your ${params.roomType} project.
+        We&rsquo;ve prepared concept directions for your ${htmlEscape(params.roomType)} project.
       </p>
       <div style="text-align:center;margin-bottom:40px;">
         <a href="${resultsUrl}" style="background:#C9A96E;color:#0A0A0A;padding:14px 32px;font-family:sans-serif;font-size:13px;letter-spacing:0.1em;text-decoration:none;display:inline-block;border-radius:2px;font-weight:400;">View your concepts</a>
       </div>
     </div>
     <div style="padding:20px 40px 24px;border-top:1px solid rgba(201,169,110,0.08);">
-      <p style="margin:0;font-size:12px;color:rgba(245,240,232,0.3);line-height:1.6;">This preview was prepared by ${params.studioName}. Reply to this email to get in touch.</p>
+      <p style="margin:0;font-size:12px;color:rgba(245,240,232,0.3);line-height:1.6;">This preview was prepared by ${htmlEscape(params.studioName)}. Reply to this email to get in touch.</p>
     </div>
   </div>
 </body>
@@ -76,8 +78,9 @@ export async function POST(req: NextRequest) {
   const secret = searchParams.get('secret')
   const total = parseInt(searchParams.get('total') ?? '2', 10)
 
-  // Verify secret
-  if (!secret || secret !== process.env.CRON_SECRET) {
+  // Verify secret — prefer dedicated WEBHOOK_SECRET, fall back to CRON_SECRET
+  const expectedSecret = process.env.WEBHOOK_SECRET ?? process.env.CRON_SECRET
+  if (!secret || !expectedSecret || secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (!submissionId) {
@@ -159,13 +162,13 @@ export async function POST(req: NextRequest) {
           designerName: designer?.name || 'Your designer',
         })
       } catch (emailErr) {
-        console.error('Results email failed:', emailErr)
+        void logError('render-webhook/results-email', emailErr, { submissionId })
       }
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error('Webhook handler error:', err)
+    void logError('render-webhook/handler', err, { submissionId: submissionId ?? undefined })
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

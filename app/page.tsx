@@ -1,9 +1,5 @@
-import IntakeForm from '@/components/IntakeForm'
+import { redirect } from 'next/navigation'
 
-export default function Home() {
-  return (
-    <main>
-      <IntakeForm />
-    </main>
-  )
+export default function RootPage() {
+  redirect('/onboard')
 }

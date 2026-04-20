@@ -1,0 +1,17 @@
+[33m2304973[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m fix: insert submission record before sending emails, prevent orphaned photos
+[33m5c41b6e[m feat: internal API secret for server-to-server routes
+[33mc97f697[m feat: edge rate limiting on /api/submit, /api/upload, /api/onboard
+[33m338bc1d[m feat: feature-flag render system, disabled by default
+[33ma3d6b01[m Simplify: extract ModalOverlay, fix ResponseModal quality issues, parallelize client email
+[33mddcd968[m Fix type errors in ResponseModal
+[33m3fa2a06[m Show Draft response button for all submissions
+[33m0a6758f[m[33m ([m[1;31morigin/master[m[33m)[m Force redeploy OnboardForm
+[33m9c7263c[m Phase 4: response draft, response tone, dashboard modal
+[33m467e609[m Fix render storage, scrape pipeline, and designer name in emails
+[33mcb80d8f[m Add ControlNet renders, portfolio scraping, mandatory photos
+[33ma5cd7d3[m Switch image generation from fal.ai to Replicate
+[33mb437e87[m Debug fal.ai: catch and log subscribe errors
+[33m6ebd8e4[m Add fal.ai debug logging
+[33m6330d60[m Fix fal.ai response parsing: unwrap .data from subscribe result
+[33m14d03fc[m Fix render timeout: reduce maxDuration to 60s for Vercel Hobby compatibility
+[33m654c732[m Initial commit from Create Next App

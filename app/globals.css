@@ -160,3 +160,57 @@ select.form-input option {
   outline: 2px solid rgba(201, 169, 110, 0.5);
   outline-offset: 2px;
 }
+
+/* ── Phase 4.10 animations ────────────────────────────────────── */
+
+@keyframes dl-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dl-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+@keyframes dl-scan {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+@keyframes dl-ellipsis {
+  0%   { width: 0; }
+  33%  { width: 0.5em; }
+  66%  { width: 1em; }
+  100% { width: 0; }
+}
+
+.dl-ellipsis::after {
+  content: '...';
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  animation: dl-ellipsis 1.5s steps(4, end) infinite;
+  vertical-align: bottom;
+}
+
+.dl-btn-primary {
+  transition: background 0.2s ease;
+}
+.dl-btn-primary:hover:not(:disabled) {
+  background: #C4A070 !important;
+}
+.dl-btn-primary:active:not(:disabled) {
+  background: #A8814A !important;
+}
+
+.dl-input:focus {
+  border-color: var(--dl-accent) !important;
+  box-shadow: 0 0 0 2px var(--dl-accent) !important;
+}
