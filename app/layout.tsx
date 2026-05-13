@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Playfair_Display, Montserrat, Fraunces, JetBrains_Mono } from 'next/font/google'
-import './globals.css'
 import './demo-preview.css'
+import './globals.css'
 import CursorGlow from './components/motion/CursorGlow'
 
 const montserrat = Montserrat({
@@ -21,7 +21,6 @@ const playfair = Playfair_Display({
 
 const fraunces = Fraunces({
   subsets: ['latin'],
-  axes: ['opsz', 'wght'],
   weight: ['200', '300', '400', '500'],
   style: ['normal', 'italic'],
   variable: '--font-fraunces',
