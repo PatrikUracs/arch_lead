@@ -4,6 +4,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import Groq from 'groq-sdk'
 import * as cheerio from 'cheerio'
 import { verifyInternalAuth } from '@/lib/internalAuth'
+import dns from 'dns/promises'
+import net from 'net'
+import https from 'https'
+import http from 'http'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -19,12 +23,117 @@ function getSupabase() {
   )
 }
 
+function isPrivateIp(ip: string): boolean {
+  // Reject private, loopback, link-local, and reserved ranges
+  const privateRanges = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^::1$/,
+    /^fc00:/i,
+    /^fe80:/i,
+  ]
+  return privateRanges.some((re) => re.test(ip))
+}
+
+async function assertSafeUrl(rawUrl: string): Promise<void> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw new Error('Invalid URL')
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error(`Disallowed protocol: ${parsed.protocol}`)
+  }
+  const hostname = parsed.hostname
+  // Reject if hostname is already an IP address
+  if (net.isIP(hostname)) {
+    if (isPrivateIp(hostname)) throw new Error(`Private IP address rejected: ${hostname}`)
+    return
+  }
+  // Resolve and check all DNS addresses
+  try {
+    const addresses = await dns.lookup(hostname, { all: true })
+    for (const { address } of addresses) {
+      if (isPrivateIp(address)) throw new Error(`DNS resolved to private IP: ${address}`)
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('DNS resolved')) throw err
+    throw new Error(`DNS resolution failed for ${hostname}`)
+  }
+}
+
+// Resolves DNS once, then connects directly to the resolved IP — eliminates DNS rebinding window.
+// Uses the original hostname for TLS SNI and the Host header so certificates validate correctly.
+async function resolvedFetch(
+  url: string,
+  options: { signal?: AbortSignal; headers?: Record<string, string> } = {}
+): Promise<{ ok: boolean; status: number; arrayBuffer(): Promise<ArrayBuffer>; text(): Promise<string>; headers: { get(k: string): string | null } }> {
+  const parsed = new URL(url)
+  const hostname = parsed.hostname
+  const useHttps = parsed.protocol === 'https:'
+  const port = parsed.port ? parseInt(parsed.port, 10) : (useHttps ? 443 : 80)
+  const path = (parsed.pathname || '/') + parsed.search
+
+  // Single DNS resolution — the actual TCP connection uses this IP, not a re-lookup
+  let resolvedIp: string
+  if (net.isIP(hostname)) {
+    resolvedIp = hostname
+  } else {
+    const result = await dns.lookup(hostname) as { address: string; family: number }
+    resolvedIp = result.address
+  }
+  if (isPrivateIp(resolvedIp)) throw new Error(`Resolved to private IP: ${resolvedIp}`)
+
+  return new Promise((resolve, reject) => {
+    const reqOptions = {
+      hostname: resolvedIp,
+      port,
+      path: path || '/',
+      method: 'GET',
+      headers: { Host: hostname, 'User-Agent': 'Mozilla/5.0 (compatible; DesignLeadBot/1.0)', ...options.headers },
+      servername: hostname,
+      rejectUnauthorized: true,
+    }
+    const req = (useHttps ? https : http).request(reqOptions, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', (chunk: Buffer) => chunks.push(chunk))
+      res.on('end', () => {
+        const body = Buffer.concat(chunks)
+        const rawHeaders = res.headers
+        resolve({
+          ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
+          status: res.statusCode ?? 0,
+          arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer,
+          text: async () => body.toString('utf-8'),
+          headers: { get: (k: string) => { const v = rawHeaders[k.toLowerCase()]; return Array.isArray(v) ? v[0] : (v ?? null) } },
+        })
+      })
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    if (options.signal) options.signal.addEventListener('abort', () => req.destroy())
+    req.end()
+  })
+}
+
 function resolveUrl(src: string, base: string): string | null {
   try {
     return new URL(src, base).href
   } catch {
     return null
   }
+}
+
+function detectMagicBytes(buf: Buffer): { mime: string; ext: string } | null {
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' }
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return { mime: 'image/png', ext: 'png' }
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return { mime: 'image/webp', ext: 'webp' }
+  return null
 }
 
 function extFromContentType(ct: string): string {
@@ -38,6 +147,7 @@ async function imageUrlToBase64(
   url: string
 ): Promise<{ data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' } | null> {
   try {
+    await assertSafeUrl(url)
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
     if (!res.ok) return null
     const buffer = await res.arrayBuffer()
@@ -124,11 +234,11 @@ export async function POST(req: NextRequest) {
 
     const portfolioUrl = designer.portfolio_url
 
-    // Fetch portfolio HTML
-    const htmlRes = await fetch(portfolioUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DesignLeadBot/1.0)' },
-      signal: AbortSignal.timeout(15000),
-    })
+    // Reject private/internal URLs before fetching (SSRF protection)
+    await assertSafeUrl(portfolioUrl)
+
+    // Fetch portfolio HTML — use resolvedFetch to eliminate DNS rebinding window
+    const htmlRes = await resolvedFetch(portfolioUrl, { signal: AbortSignal.timeout(15000) })
     if (!htmlRes.ok) throw new Error(`Portfolio fetch failed: ${htmlRes.status}`)
     const html = await htmlRes.text()
 
@@ -163,13 +273,18 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < unique.length; i++) {
       try {
-        const imgRes = await fetch(unique[i], { signal: AbortSignal.timeout(10000) })
+        await assertSafeUrl(unique[i])
+        const imgRes = await resolvedFetch(unique[i], { signal: AbortSignal.timeout(10000) })
         if (!imgRes.ok) continue
 
-        const contentType = imgRes.headers.get('content-type') ?? 'image/jpeg'
-        const ext = extFromContentType(contentType)
         const buffer = Buffer.from(await imgRes.arrayBuffer())
-        const path = `${designer_slug}/portfolio-${i}.${ext}`
+        const magic = detectMagicBytes(buffer)
+        if (!magic) {
+          console.warn(`Skipping portfolio image ${i} — failed magic byte check`)
+          continue
+        }
+        const path = `${designer_slug}/portfolio-${i}.${magic.ext}`
+        const contentType = magic.mime
 
         const { error: uploadErr } = await supabase.storage
           .from(BUCKET)

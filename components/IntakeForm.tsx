@@ -7,8 +7,12 @@ type FormData = {
   email: string
   roomType: string
   roomSize: string
+  projectType: string
+  roomCount: string
   designStyle: string
-  budgetRange: string
+  designBudgetHuf: string
+  fitoutPlanned: '' | 'yes' | 'no'
+  fitoutBudgetHuf: string
   timeline: string
   additionalInfo: string
 }
@@ -16,58 +20,55 @@ type FormData = {
 type PhotoItem = { file: File; preview: string }
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
+const PROJECT_TYPES = [
+  { label: 'Teljes lakásfelújítás',     value: 'full_redesign'   },
+  { label: 'Részleges átalakítás',      value: 'partial_refresh' },
+  { label: 'Egyetlen helyiség',         value: 'single_room'     },
+  { label: 'Tanácsadás / konzultáció', value: 'consultation'    },
+]
+
+const ROOM_COUNTS = ['1', '2', '3', '4', '5+']
+
+const DESIGN_FEE_BRACKETS = [
+  '400 000 – 800 000 Ft',
+  '800 000 – 1 500 000 Ft',
+  '1 500 000 – 3 000 000 Ft',
+  '3 000 000 – 6 000 000 Ft',
+  '6 000 000 Ft felett',
+]
+
 const ROOM_TYPES = [
-  'Living room',
-  'Bedroom',
-  'Kitchen',
-  'Bathroom',
-  'Home office',
-  'Multiple rooms',
+  'Nappali',
+  'Hálószoba',
+  'Konyha',
+  'Fürdőszoba',
+  'Dolgozószoba',
+  'Több helyiség',
 ]
 
 const DESIGN_STYLES = [
-  'Minimalist & clean',
-  'Warm & natural',
-  'Bold & eclectic',
-  'Modern & urban',
-  "I'm not sure yet",
-]
-
-const BUDGET_RANGES = [
-  'Under 500,000 HUF',
-  '500,000–1,500,000 HUF',
-  '1,500,000–3,000,000 HUF',
-  'Above 3,000,000 HUF',
+  'Minimalista & letisztult',
+  'Meleg & természetes',
+  'Merész & eklektikus',
+  'Modern & urbánus',
+  'Még nem tudom',
 ]
 
 const TIMELINES = [
-  'As soon as possible',
-  '1–3 months',
-  '3–6 months',
-  'Just exploring for now',
+  'Minél hamarabb',
+  '1–3 hónap',
+  '3–6 hónap',
+  'Egyelőre csak tájékozódom',
 ]
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
-const DL = {
-  '--dl-bg-page':        '#0F0D0A',
-  '--dl-bg-card':        '#181510',
-  '--dl-bg-elevated':    '#1A1710',
-  '--dl-accent':         '#B8935A',
-  '--dl-accent-dim':     'rgba(184, 147, 90, 0.3)',
-  '--dl-accent-subtle':  'rgba(184, 147, 90, 0.12)',
-  '--dl-text-primary':   '#EDE5D0',
-  '--dl-text-muted':     'rgba(237, 229, 208, 0.35)',
-  '--dl-border-default': 'rgba(255, 255, 255, 0.05)',
-  '--dl-border-accent':  'rgba(184, 147, 90, 0.2)',
-  '--dl-rule-gradient':  'linear-gradient(90deg, rgba(184,147,90,0.4) 0%, transparent 70%)',
-} as React.CSSProperties
 
 const STEPS = [
-  { label: 'Rólad',              heading: 'Rólad',              subtitle: 'Mutasd be magad' },
-  { label: 'A térről',           heading: 'A térről',           subtitle: 'Meséld el a tervezendő helyiségről' },
-  { label: 'Képek és részletek', heading: 'Képek és részletek', subtitle: 'Fotók és kiegészítő információk' },
+  { label: 'Rólad',         heading: 'Rólad',         subtitle: 'Mutasd be magad' },
+  { label: 'A projektről',  heading: 'A projektről',  subtitle: 'Meséld el a tervezendő projektről' },
+  { label: 'Fotók & részletek', heading: 'Fotók & részletek', subtitle: 'Fotók és kiegészítő információk' },
 ]
 
 /* ── Field label ────────────────────────────────────────────────── */
@@ -113,8 +114,12 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
     email: '',
     roomType: '',
     roomSize: '',
+    projectType: '',
+    roomCount: '',
     designStyle: '',
-    budgetRange: '',
+    designBudgetHuf: '',
+    fitoutPlanned: '',
+    fitoutBudgetHuf: '',
     timeline: '',
     additionalInfo: '',
   })
@@ -131,8 +136,8 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
     const valid: PhotoItem[] = []
     let errorMsg = ''
     for (const file of incoming) {
-      if (!ALLOWED_TYPES.includes(file.type)) { errorMsg = 'Only JPEG, PNG, or WebP images are allowed.'; continue }
-      if (file.size > MAX_PHOTO_SIZE) { errorMsg = `"${file.name}" is over 5 MB.`; continue }
+      if (!ALLOWED_TYPES.includes(file.type)) { errorMsg = 'Csak JPEG vagy PNG formátumú képek tölthetők fel.'; continue }
+      if (file.size > MAX_PHOTO_SIZE) { errorMsg = `"${file.name}" mérete meghaladja az 5 MB-ot.`; continue }
       valid.push({ file, preview: URL.createObjectURL(file) })
     }
     setPhotos((prev) => {
@@ -158,37 +163,45 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
   /* ── Validation ─────────────────────────────────────────────────── */
   function validateStep1(): boolean {
     const e: Partial<Record<keyof FormData | 'photos', string>> = {}
-    if (!form.name.trim()) e.name = 'Please enter your name.'
-    if (!form.email.trim()) e.email = 'Please enter your email address.'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email address.'
+    if (!form.name.trim()) e.name = 'Kérjük, add meg a neved.'
+    if (!form.email.trim()) e.email = 'Kérjük, add meg az e-mail címed.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Kérjük, adj meg egy érvényes e-mail címet.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   function validateStep2(): boolean {
     const e: Partial<Record<keyof FormData | 'photos', string>> = {}
-    if (!form.roomType) e.roomType = 'Please select a room type.'
-    if (!form.roomSize) e.roomSize = 'Please enter the room size.'
-    else { const s = Number(form.roomSize); if (isNaN(s) || s < 10 || s > 500) e.roomSize = 'Room size must be between 10 and 500 m².' }
-    if (!form.designStyle) e.designStyle = 'Please select a design style.'
-    if (!form.budgetRange) e.budgetRange = 'Please select a budget range.'
-    if (!form.timeline) e.timeline = 'Please select a timeline.'
+    if (!form.roomType) e.roomType = 'Kérjük, válassz helyiség típust.'
+    if (!form.roomSize) e.roomSize = 'Kérjük, add meg a helyiség méretét.'
+    else { const s = Number(form.roomSize); if (isNaN(s) || s < 10 || s > 500) e.roomSize = 'A helyiség mérete 10 és 500 m² között legyen.' }
+    if (!form.projectType) e.projectType = 'Kérjük, válassz projekt típust.'
+    if (!form.roomCount) e.roomCount = 'Kérjük, add meg az érintett helyiségek számát.'
+    if (!form.designStyle) e.designStyle = 'Kérjük, válassz stílusirányzatot.'
+    if (!form.designBudgetHuf) e.designBudgetHuf = 'Kérjük, válassz tervezői díjkeretet.'
+    if (!form.fitoutPlanned) e.fitoutPlanned = 'Kérjük, jelezd, hogy tervezed-e a kivitelezést.'
+    if (form.fitoutPlanned === 'yes' && !form.fitoutBudgetHuf) e.fitoutBudgetHuf = 'Kérjük, válasszon kivitelezési keretet.'
+    if (!form.timeline) e.timeline = 'Kérjük, válassz időkeretet.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormData | 'photos', string>> = {}
-    if (!form.name.trim()) e.name = 'Please enter your name.'
-    if (!form.email.trim()) e.email = 'Please enter your email address.'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email address.'
-    if (!form.roomType) e.roomType = 'Please select a room type.'
-    if (!form.roomSize) e.roomSize = 'Please enter the room size.'
-    else { const s = Number(form.roomSize); if (isNaN(s) || s < 10 || s > 500) e.roomSize = 'Room size must be between 10 and 500 m².' }
-    if (!form.designStyle) e.designStyle = 'Please select a design style.'
-    if (!form.budgetRange) e.budgetRange = 'Please select a budget range.'
-    if (!form.timeline) e.timeline = 'Please select a timeline.'
-    if (photos.length === 0) e.photos = 'Please upload at least one photo of your space.'
+    if (!form.name.trim()) e.name = 'Kérjük, add meg a neved.'
+    if (!form.email.trim()) e.email = 'Kérjük, add meg az e-mail címed.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Kérjük, adj meg egy érvényes e-mail címet.'
+    if (!form.roomType) e.roomType = 'Kérjük, válassz helyiség típust.'
+    if (!form.roomSize) e.roomSize = 'Kérjük, add meg a helyiség méretét.'
+    else { const s = Number(form.roomSize); if (isNaN(s) || s < 10 || s > 500) e.roomSize = 'A helyiség mérete 10 és 500 m² között legyen.' }
+    if (!form.projectType) e.projectType = 'Kérjük, válassz projekt típust.'
+    if (!form.roomCount) e.roomCount = 'Kérjük, add meg az érintett helyiségek számát.'
+    if (!form.designStyle) e.designStyle = 'Kérjük, válassz stílusirányzatot.'
+    if (!form.designBudgetHuf) e.designBudgetHuf = 'Kérjük, válassz tervezői díjkeretet.'
+    if (!form.fitoutPlanned) e.fitoutPlanned = 'Kérjük, jelezd, hogy tervezed-e a kivitelezést.'
+    if (form.fitoutPlanned === 'yes' && !form.fitoutBudgetHuf) e.fitoutBudgetHuf = 'Kérjük, válasszon kivitelezési keretet.'
+    if (!form.timeline) e.timeline = 'Kérjük, válassz időkeretet.'
+    if (photos.length === 0) e.photos = 'Kérjük, tölts fel legalább 1 fotót.'
     setErrors(e)
     if (e.photos) setPhotoError(e.photos)
     setSubmitAttempted(true)
@@ -205,19 +218,28 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
       photos.forEach((p) => photoFormData.append('photos', p.file))
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: photoFormData })
       if (!uploadRes.ok) {
-        let msg = 'Photo upload failed.'
+        let msg = 'Fotó feltöltése sikertelen.'
         try { const d = await uploadRes.json(); msg = d.error || msg } catch { /* non-JSON */ }
         throw new Error(msg)
       }
-      const { paths: photoPaths } = await uploadRes.json()
+      const { paths: photoPaths, uploadToken } = await uploadRes.json()
+      const payload = {
+        ...form,
+        roomCount: form.roomCount === '5+' ? '5' : form.roomCount,
+        fitoutBudgetHuf: form.fitoutPlanned === 'yes' ? form.fitoutBudgetHuf : null,
+        photoPaths,
+        uploadToken,
+        designer_slug: designer.slug,
+      }
+      console.log('[submit] payload:', JSON.stringify(payload, null, 2))
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, photoPaths, designer_slug: designer.slug }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
-        let msg = 'Submission failed.'
-        try { const d = await res.json(); msg = d.error || msg } catch { /* non-JSON */ }
+        let msg = 'Beküldés sikertelen.'
+        try { const d = await res.json(); console.error('[submit] server error:', d); msg = d.error || msg } catch { /* non-JSON */ }
         throw new Error(msg)
       }
       setStatus('success')
@@ -264,7 +286,7 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
   if (status === 'success') {
     return (
       <div
-        style={{ ...DL, background: embed ? 'transparent' : 'var(--dl-bg-page)', minHeight: '100vh' }}
+        style={{ background: embed ? 'transparent' : 'var(--dl-bg-page)', minHeight: '100vh' }}
         className="flex items-center justify-center px-4 py-16"
       >
         <div style={{ ...cardStyle, padding: '64px 48px', textAlign: 'center' }}>
@@ -275,10 +297,10 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
             </svg>
           </div>
           <h2 style={{ fontFamily: 'var(--font-playfair)', fontSize: 24, fontWeight: 400, color: 'var(--dl-text-primary)', marginBottom: 12, letterSpacing: '0.02em' }}>
-            Thank you
+            Köszönjük!
           </h2>
           <p style={{ color: 'var(--dl-text-muted)', fontSize: 15, lineHeight: 1.7, maxWidth: 340, margin: '0 auto', fontFamily: 'var(--font-montserrat)', fontWeight: 200 }}>
-            {displayName.split(' ')[0]} will review your project and be in touch within 2 business days.
+            Érdeklődésed megkaptuk. Hamarosan felvesszük veled a kapcsolatot.
           </p>
         </div>
       </div>
@@ -289,7 +311,6 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
   return (
     <div
       style={{
-        ...DL,
         background: embed ? 'transparent' : 'var(--dl-bg-page)',
         minHeight: '100vh',
         animation: 'dl-fade-in 0.3s ease both',
@@ -324,7 +345,7 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
               marginTop: 10,
             }}
           >
-            Thoughtful spaces for modern living
+            Átgondolt terek a modern élethez
           </p>
           <hr style={{ border: 'none', borderTop: '1px solid var(--dl-border-accent)', width: 40, margin: '20px auto 0' }} />
         </div>
@@ -382,19 +403,19 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
           {step === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <FieldLabel htmlFor="name">Full name</FieldLabel>
+                <FieldLabel htmlFor="name">Neved</FieldLabel>
                 <input
                   id="name" name="name" type="text" autoComplete="name"
-                  value={form.name} onChange={handleChange} placeholder="Jane Smith"
+                  value={form.name} onChange={handleChange} placeholder="Teljes neved"
                   className="form-input dl-input" style={inputOverride}
                 />
                 <FieldError message={errors.name} />
               </div>
               <div>
-                <FieldLabel htmlFor="email">Email address</FieldLabel>
+                <FieldLabel htmlFor="email">E-mail címed</FieldLabel>
                 <input
                   id="email" name="email" type="email" autoComplete="email"
-                  value={form.email} onChange={handleChange} placeholder="jane@example.com"
+                  value={form.email} onChange={handleChange} placeholder="email@example.com"
                   className="form-input dl-input" style={inputOverride}
                 />
                 <FieldError message={errors.email} />
@@ -402,31 +423,53 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
             </div>
           )}
 
-          {/* ── STEP 2: A térről ──────────────────────────────────── */}
+          {/* ── STEP 2: A projektről ──────────────────────────────── */}
           {step === 2 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <FieldLabel htmlFor="roomType">Room type</FieldLabel>
+                <FieldLabel htmlFor="roomType">Helyiség típusa</FieldLabel>
                 <select
                   id="roomType" name="roomType" value={form.roomType}
                   onChange={handleChange} className="form-input dl-input" style={inputOverride}
                 >
-                  <option value="">Select a room type</option>
+                  <option value="">Válassz helyiség típust</option>
                   {ROOM_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <FieldError message={errors.roomType} />
               </div>
               <div>
-                <FieldLabel htmlFor="roomSize">Room size (m²)</FieldLabel>
+                <FieldLabel htmlFor="roomSize">Helyiség mérete (m²)</FieldLabel>
                 <input
                   id="roomSize" name="roomSize" type="number" min={10} max={500}
-                  value={form.roomSize} onChange={handleChange} placeholder="e.g. 35"
+                  value={form.roomSize} onChange={handleChange} placeholder="pl. 25"
                   className="form-input dl-input" style={inputOverride}
                 />
                 <FieldError message={errors.roomSize} />
               </div>
               <div>
-                <FieldLabel>Design style</FieldLabel>
+                <FieldLabel htmlFor="projectType">Projekt típusa</FieldLabel>
+                <select
+                  id="projectType" name="projectType" value={form.projectType}
+                  onChange={handleChange} className="form-input dl-input" style={inputOverride}
+                >
+                  <option value="">Válassz típust</option>
+                  {PROJECT_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+                <FieldError message={errors.projectType} />
+              </div>
+              <div>
+                <FieldLabel htmlFor="roomCount">Érintett helyiségek száma</FieldLabel>
+                <select
+                  id="roomCount" name="roomCount" value={form.roomCount}
+                  onChange={handleChange} className="form-input dl-input" style={inputOverride}
+                >
+                  <option value="">Válasszon</option>
+                  {ROOM_COUNTS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <FieldError message={errors.roomCount} />
+              </div>
+              <div>
+                <FieldLabel>Stílusirányzat</FieldLabel>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                   {DESIGN_STYLES.map((style) => {
                     const checked = form.designStyle === style
@@ -463,46 +506,92 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
                 <FieldError message={errors.designStyle} />
               </div>
               <div>
-                <FieldLabel htmlFor="budgetRange">Budget range</FieldLabel>
-                <select
-                  id="budgetRange" name="budgetRange" value={form.budgetRange}
-                  onChange={handleChange} className="form-input dl-input" style={inputOverride}
-                >
-                  <option value="">Select a budget range</option>
-                  {BUDGET_RANGES.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-                <FieldError message={errors.budgetRange} />
-              </div>
-              <div>
-                <FieldLabel htmlFor="timeline">Timeline</FieldLabel>
+                <FieldLabel htmlFor="timeline">Mikor szeretné elkezdeni?</FieldLabel>
                 <select
                   id="timeline" name="timeline" value={form.timeline}
                   onChange={handleChange} className="form-input dl-input" style={inputOverride}
                 >
-                  <option value="">Select a timeline</option>
+                  <option value="">Válasszon időkeretet</option>
                   {TIMELINES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <FieldError message={errors.timeline} />
               </div>
+
+              {/* Design fee budget */}
+              <div>
+                <FieldLabel>Tervezői díjkeret</FieldLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  {DESIGN_FEE_BRACKETS.map((bracket) => {
+                    const checked = form.designBudgetHuf === bracket
+                    return (
+                      <label key={bracket} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer', padding: '11px 14px', borderRadius: 2, border: `1px solid ${checked ? 'var(--dl-accent)' : 'var(--dl-border-accent)'}`, background: checked ? 'var(--dl-accent-subtle)' : 'transparent', transition: 'all 0.2s ease' }}>
+                        <input type="radio" name="designBudgetHuf" value={bracket} checked={checked} onChange={handleChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                        <span style={{ fontSize: 13, color: checked ? 'var(--dl-text-primary)' : 'rgba(237,229,208,0.65)', fontFamily: 'var(--font-montserrat)', fontWeight: 200, transition: 'color 0.2s ease' }}>{bracket}</span>
+                        <span style={{ width: 6, height: 6, minWidth: 6, borderRadius: '50%', border: `1px solid ${checked ? 'var(--dl-accent)' : 'var(--dl-accent-dim)'}`, background: checked ? 'var(--dl-accent)' : 'transparent', flexShrink: 0, transition: 'all 0.2s ease' }} />
+                      </label>
+                    )
+                  })}
+                </div>
+                <FieldError message={errors.designBudgetHuf} />
+              </div>
+
+              {/* Fit-out planned */}
+              <div>
+                <FieldLabel>Tervezi a kivitelezést / bútorozást is?</FieldLabel>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  {([['yes', 'Igen'], ['no', 'Nem']] as ['yes'|'no', string][]).map(([val, label]) => {
+                    const checked = form.fitoutPlanned === val
+                    return (
+                      <label key={val} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', padding: '11px 14px', borderRadius: 2, border: `1px solid ${checked ? 'var(--dl-accent)' : 'var(--dl-border-accent)'}`, background: checked ? 'var(--dl-accent-subtle)' : 'transparent', transition: 'all 0.2s ease' }}>
+                        <input type="radio" name="fitoutPlanned" value={val} checked={checked} onChange={handleChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                        <span style={{ fontSize: 13, color: checked ? 'var(--dl-text-primary)' : 'rgba(237,229,208,0.65)', fontFamily: 'var(--font-montserrat)', fontWeight: 200, transition: 'color 0.2s ease' }}>{label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <FieldError message={errors.fitoutPlanned} />
+              </div>
+
+              {/* Conditional fit-out budget */}
+              {form.fitoutPlanned === 'yes' && (
+                <div>
+                  <FieldLabel>Kivitelezési / bútorozási keret</FieldLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                    {DESIGN_FEE_BRACKETS.map((bracket) => {
+                      const checked = form.fitoutBudgetHuf === bracket
+                      return (
+                        <label key={bracket} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer', padding: '11px 14px', borderRadius: 2, border: `1px solid ${checked ? 'var(--dl-accent)' : 'var(--dl-border-accent)'}`, background: checked ? 'var(--dl-accent-subtle)' : 'transparent', transition: 'all 0.2s ease' }}>
+                          <input type="radio" name="fitoutBudgetHuf" value={bracket} checked={checked} onChange={handleChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                          <span style={{ fontSize: 13, color: checked ? 'var(--dl-text-primary)' : 'rgba(237,229,208,0.65)', fontFamily: 'var(--font-montserrat)', fontWeight: 200, transition: 'color 0.2s ease' }}>{bracket}</span>
+                          <span style={{ width: 6, height: 6, minWidth: 6, borderRadius: '50%', border: `1px solid ${checked ? 'var(--dl-accent)' : 'var(--dl-accent-dim)'}`, background: checked ? 'var(--dl-accent)' : 'transparent', flexShrink: 0, transition: 'all 0.2s ease' }} />
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <FieldError message={errors.fitoutBudgetHuf} />
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── STEP 3: Képek és részletek ────────────────────────── */}
+          {/* ── STEP 3: Fotók & részletek ─────────────────────────── */}
           {step === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* Photo upload */}
               <div>
                 <FieldLabel>
-                  Upload 1–3 photos of the room{' '}
-                  <span style={{ color: 'var(--dl-accent-dim)', textTransform: 'none', letterSpacing: 0, fontWeight: 200 }}>(required)</span>
+                  Fotók feltöltése{' '}
+                  <span style={{ color: 'var(--dl-accent-dim)', textTransform: 'none', letterSpacing: 0, fontWeight: 200 }}>
+                    — Tölts fel 1–3 fotót a helyiségről (kötelező)
+                  </span>
                 </FieldLabel>
                 <input
                   ref={fileInputRef} type="file" accept="image/jpeg,image/png" multiple
-                  onChange={handleFileInput} style={{ display: 'none' }} aria-label="Upload room photos"
+                  onChange={handleFileInput} style={{ display: 'none' }} aria-label="Fotók feltöltése"
                 />
                 {photos.length < 3 && (
                   <div
-                    role="button" tabIndex={0} aria-label="Click or drag to upload photos"
+                    role="button" tabIndex={0} aria-label="Kattints vagy húzd ide a fotókat"
                     className="photo-drop-zone"
                     onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
                     onClick={() => fileInputRef.current?.click()}
@@ -528,15 +617,15 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
                       </svg>
                     </div>
                     <p style={{ color: isDragging ? 'var(--dl-accent)' : 'var(--dl-text-muted)', fontSize: 13, margin: '0 0 4px', fontFamily: 'var(--font-montserrat)', fontWeight: 200, transition: 'color 0.2s ease' }}>
-                      {isDragging ? 'Drop photos here' : 'Click to upload or drag and drop'}
+                      {isDragging ? 'Engedd el a fotókat' : 'Húzd ide a fotókat, vagy kattints a tallózáshoz'}
                     </p>
                     {photos.length > 0 && (
                       <p style={{ color: 'var(--dl-accent)', fontSize: 12, margin: '4px 0 0', fontFamily: 'var(--font-montserrat)', fontWeight: 300 }}>
-                        {photos.length} {photos.length === 1 ? 'photo' : 'photos'} selected
+                        {photos.length} {photos.length === 1 ? 'fotó kiválasztva' : 'fotó kiválasztva'}
                       </p>
                     )}
                     <p style={{ color: 'rgba(237,229,208,0.2)', fontSize: 12, margin: '4px 0 0', fontFamily: 'var(--font-montserrat)', fontWeight: 200 }}>
-                      JPEG or PNG · max 5 MB each · up to 3 photos
+                      JPEG vagy PNG · max 5 MB/db · legfeljebb 3 fotó
                     </p>
                   </div>
                 )}
@@ -546,12 +635,12 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
                       <div key={i} style={{ position: 'relative', width: 88, height: 88, flexShrink: 0 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={item.preview} alt={`Room photo ${i + 1}`}
+                          src={item.preview} alt={`Helyiség fotó ${i + 1}`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 2, border: '1px solid var(--dl-border-accent)', display: 'block' }}
                         />
                         <button
-                          type="button" onClick={() => removePhoto(i)} aria-label={`Remove photo ${i + 1}`}
-                          style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: '50%', background: 'var(--dl-accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F0D0A', fontSize: 12, fontWeight: 700, lineHeight: 1, padding: 0 }}
+                          type="button" onClick={() => removePhoto(i)} aria-label={`Fotó eltávolítása ${i + 1}`}
+                          style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: '50%', background: 'var(--dl-accent)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--dl-bg-page)', fontSize: 12, fontWeight: 700, lineHeight: 1, padding: 0 }}
                         >×</button>
                       </div>
                     ))}
@@ -559,7 +648,7 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
                       <button
                         type="button" onClick={() => fileInputRef.current?.click()}
                         style={{ width: 88, height: 88, borderRadius: 2, border: '1px dashed var(--dl-border-accent)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--dl-accent-dim)', fontSize: 22, transition: 'border-color 0.2s ease', flexShrink: 0 }}
-                        aria-label="Add another photo"
+                        aria-label="További fotó hozzáadása"
                       >+</button>
                     )}
                   </div>
@@ -570,13 +659,13 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
               {/* Additional info */}
               <div>
                 <FieldLabel htmlFor="additionalInfo">
-                  Anything else we should know?{' '}
-                  <span style={{ color: 'var(--dl-accent-dim)', textTransform: 'none', letterSpacing: 0, fontWeight: 200 }}>(optional)</span>
+                  Egyéb megjegyzés{' '}
+                  <span style={{ color: 'var(--dl-accent-dim)', textTransform: 'none', letterSpacing: 0, fontWeight: 200 }}>(opcionális)</span>
                 </FieldLabel>
                 <textarea
                   id="additionalInfo" name="additionalInfo" rows={4}
                   value={form.additionalInfo} onChange={handleChange}
-                  placeholder="Special requirements, inspirations, constraints…"
+                  placeholder="Bármilyen egyéb információ, ami segíthet a tervezőnek..."
                   className="form-input dl-input" style={inputOverride}
                 />
               </div>
@@ -584,12 +673,12 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
               {/* Error messages */}
               {submitAttempted && Object.keys(errors).length > 0 && status !== 'loading' && (
                 <p style={{ color: 'rgba(220, 130, 90, 0.9)', fontSize: 12, fontFamily: 'var(--font-montserrat)', fontWeight: 200 }}>
-                  Please review the fields above — some required information is missing.
+                  Kérjük, ellenőrizd a fenti mezőket — néhány kötelező adat hiányzik.
                 </p>
               )}
               {status === 'error' && (
                 <p style={{ color: 'rgba(220, 130, 90, 0.9)', fontSize: 12, fontFamily: 'var(--font-montserrat)', fontWeight: 200 }}>
-                  Something went wrong. Please try again or contact us directly.
+                  Hiba történt. Kérjük, próbáld újra.
                 </p>
               )}
             </div>
@@ -601,26 +690,23 @@ export default function IntakeForm({ designer, embed }: { designer: DesignerProp
               <button
                 type="button" onClick={prevStep}
                 style={{ flex: '0 0 auto', background: 'transparent', border: '1px solid var(--dl-border-accent)', color: 'var(--dl-text-muted)', fontFamily: 'var(--font-montserrat)', fontWeight: 400, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 20px', cursor: 'pointer', transition: 'border-color 0.2s ease, background 0.2s ease' }}
-              >←</button>
+              >Vissza</button>
             )}
             {step < 3 ? (
               <button
                 type="button" onClick={nextStep}
-                style={{ flex: 1, background: 'var(--dl-accent)', color: '#0F0D0A', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-montserrat)' }}
+                style={{ flex: 1, background: 'var(--dl-accent)', color: 'var(--dl-bg-page)', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-montserrat)' }}
                 className="dl-btn-primary"
               >
-                Következő →
+                Tovább →
               </button>
             ) : (
               <button
                 type="submit" disabled={status === 'loading'}
-                style={{ flex: 1, background: 'var(--dl-accent)', color: '#0F0D0A', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: status === 'loading' ? 'not-allowed' : 'pointer', opacity: status === 'loading' ? 0.8 : 1, fontFamily: 'var(--font-montserrat)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, background: 'var(--dl-accent)', color: 'var(--dl-bg-page)', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: status === 'loading' ? 'not-allowed' : 'pointer', opacity: status === 'loading' ? 0.8 : 1, fontFamily: 'var(--font-montserrat)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 className="dl-btn-primary"
               >
-                {status === 'loading'
-                  ? <span className="dl-ellipsis">Beküldés</span>
-                  : 'Beküldés'
-                }
+                {status === 'loading' ? 'Küldés...' : 'Küldés'}
               </button>
             )}
           </div>

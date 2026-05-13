@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
+/**
+ * `details` is stored verbatim in the error_logs table — never pass objects containing
+ * secrets, tokens, passwords, or API keys. Use only safe identifiers (slug, id, etc.).
+ */
 export async function logError(
   context: string,
   error: unknown,
