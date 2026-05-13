@@ -2,15 +2,13 @@ import { NextRequest } from 'next/server'
 import { timingSafeEqual } from 'crypto'
 
 function safeStringEqual(a: string, b: string): boolean {
-  // Pad shorter string so lengths match — timingSafeEqual requires equal-length Buffers.
-  // Length mismatch still returns false; we just avoid leaking which side is shorter.
   const ba = Buffer.from(a)
   const bb = Buffer.from(b)
-  if (ba.length !== bb.length) {
-    timingSafeEqual(ba, ba) // dummy call to keep timing consistent
-    return false
-  }
-  return timingSafeEqual(ba, bb)
+  const len = Math.max(ba.length, bb.length)
+  const pa = Buffer.concat([ba, Buffer.alloc(len - ba.length)])
+  const pb = Buffer.concat([bb, Buffer.alloc(len - bb.length)])
+  const equal = timingSafeEqual(pa, pb)
+  return equal && ba.length === bb.length
 }
 
 export function verifyAdminAuth(req: NextRequest): boolean {

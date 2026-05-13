@@ -148,6 +148,7 @@ export async function POST(
     }
 
     const storedUrl = await storeRender(replicateUrl, submissionId, index)
+    existing[index] = storedUrl
 
     const filled = existing.filter(Boolean)
     const isComplete = filled.length >= total

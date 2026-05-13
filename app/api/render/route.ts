@@ -1,9 +1,7 @@
-// TODO: When rendering is re-enabled, add verifyInternalAuth(req) as the first check in the POST
-// handler using lib/internalAuth.ts, and use WEBHOOK_SECRET (not CRON_SECRET) passed as a path
-// segment (e.g. /api/render-webhook/[secret]) for Replicate webhook validation.
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
 import { createClient } from '@supabase/supabase-js'
+import { verifyInternalAuth } from '@/lib/internalAuth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -51,6 +49,10 @@ async function createPrediction(prompt: string, imageUrl: string, webhookUrl: st
 
 
 export async function POST(req: NextRequest) {
+  if (!verifyInternalAuth(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   let submissionId: string
   try {
     const body = await req.json()
@@ -96,13 +98,13 @@ export async function POST(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
   if (!appUrl) return NextResponse.json({ error: 'Missing NEXT_PUBLIC_APP_URL' }, { status: 500 })
 
-  const secret = process.env.CRON_SECRET
-  if (!secret) return NextResponse.json({ error: 'Missing CRON_SECRET' }, { status: 500 })
+  const secret = process.env.WEBHOOK_SECRET
+  if (!secret) return NextResponse.json({ error: 'Missing WEBHOOK_SECRET' }, { status: 500 })
 
   try {
     const predictionIds: string[] = []
     for (let i = 0; i < 2; i++) {
-      const webhookUrl = `${appUrl}/api/render-webhook?submissionId=${submissionId}&index=${i}&secret=${secret}&total=2`
+      const webhookUrl = `${appUrl}/api/render-webhook/${secret}?submissionId=${submissionId}&index=${i}&total=2`
       predictionIds.push(await createPrediction(prompt, firstPhoto, webhookUrl))
       console.log(`Prediction ${i} created:`, predictionIds[i])
     }

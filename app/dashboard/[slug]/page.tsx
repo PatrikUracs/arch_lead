@@ -3,19 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { RENDERS_ENABLED } from '@/lib/flags'
+import ThemeToggle from '@/components/ThemeToggle'
 
 /* ── CSS tokens ──────────────────────────────────────────────────── */
 const T = {
-  bgPage:       '#0F0D0A',
-  bgCard:       '#181510',
-  bgElevated:   '#1A1710',
-  accent:       '#B8935A',
-  accentDim:    'rgba(184,147,90,0.3)',
-  accentSubtle: 'rgba(184,147,90,0.12)',
-  textPrimary:  '#EDE5D0',
-  textMuted:    'rgba(237,229,208,0.35)',
-  borderDefault:'rgba(255,255,255,0.05)',
-  borderAccent: 'rgba(184,147,90,0.2)',
+  bgPage:       'var(--dl-bg-page)',
+  bgCard:       'var(--dl-bg-card)',
+  bgElevated:   'var(--dl-bg-elevated)',
+  accent:       'var(--dl-accent)',
+  accentDim:    'var(--dl-accent-dim)',
+  accentSubtle: 'var(--dl-accent-subtle)',
+  textPrimary:  'var(--dl-text-primary)',
+  textMuted:    'var(--dl-text-muted)',
+  borderDefault:'var(--dl-border-default)',
+  borderAccent: 'var(--dl-border-accent)',
 }
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -41,12 +42,32 @@ type Designer = {
   notification_preference: string
   ai_style_profile: string | null
   portfolio_scrape_status: string | null
+  pricing_hourly: boolean
+  pricing_flat: boolean
+  pricing_minimum: boolean
+  pricing_m2: boolean
+  pricing_hourly_rate: number | null
+  pricing_flat_rate: number | null
+  pricing_minimum_amount: number | null
+  pricing_m2_rate: number | null
+  market_positioning: string | null
 }
 
 type QualityFilter = 'all' | 'High' | 'Medium' | 'Low'
 type SortOrder    = 'newest' | 'oldest' | 'quality'
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
+const statusLabel: Record<string, string> = {
+  'Új': 'Új',
+  'Kapcsolatba lépett': 'Kapcsolatba lépett',
+  'Szerződött': 'Szerződött',
+  'Nem releváns': 'Nem releváns',
+  'New': 'Új',
+  'Contacted': 'Kapcsolatba lépett',
+  'Converted': 'Szerződött',
+  'Not a fit': 'Nem releváns',
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('hu-HU', { day: 'numeric', month: 'short', year: '2-digit' })
 }
@@ -105,7 +126,7 @@ function ModalOverlay({ onClose, children }: { onClose: () => void; children: Re
     <div ref={overlayRef} onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div style={{ background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, maxWidth: 640, width: '100%', maxHeight: '80vh', overflow: 'auto', padding: '40px', position: 'relative' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 20, background: 'none', border: 'none', color: T.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }} aria-label="Close">×</button>
+        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 20, background: 'none', border: 'none', color: T.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }} aria-label="Bezárás">×</button>
         {children}
       </div>
     </div>
@@ -175,10 +196,11 @@ function CopyButton({ value }: { value: string }) {
 
 /* ── Password screen ─────────────────────────────────────────────── */
 function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => void }) {
-  const [password, setPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-  const [shake, setShake]       = useState(false)
+  const [password,    setPassword]    = useState('')
+  const [rememberMe,  setRememberMe]  = useState(false)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
+  const [shake,       setShake]       = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -187,8 +209,9 @@ function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => vo
     const data = await res.json()
     setLoading(false)
     if (data.ok) {
-      sessionStorage.setItem(`designlead_auth_${slug}`, 'true')
-      sessionStorage.setItem(`designlead_pw_${slug}`, password)
+      const store = rememberMe ? localStorage : sessionStorage
+      store.setItem(`designlead_auth_${slug}`, 'true')
+      store.setItem(`designlead_pw_${slug}`, password)
       onSuccess()
     } else {
       setError('Hibás jelszó')
@@ -200,7 +223,7 @@ function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => vo
   return (
     <>
       <style>{`@keyframes dl-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}.dl-shake{animation:dl-shake 0.5s ease}`}</style>
-      <div style={{ background: `radial-gradient(ellipse at center, #181510 0%, ${T.bgPage} 70%)`, minHeight: '100vh' }} className="flex items-center justify-center px-4 py-16">
+      <div style={{ background: `radial-gradient(ellipse at center, var(--dl-bg-elevated) 0%, var(--dl-bg-page) 70%)`, minHeight: '100vh' }} className="flex items-center justify-center px-4 py-16">
         <div style={{ background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, width: '100%', maxWidth: 400, padding: '48px' }}>
           <h1 style={{ fontFamily: 'var(--font-playfair)', fontSize: 24, fontWeight: 400, color: T.textPrimary, margin: '0 0 8px', letterSpacing: '0.02em' }}>Stúdió dashboard</h1>
           <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 11, fontWeight: 200, color: T.textMuted, letterSpacing: '0.12em', marginBottom: 32 }}>Add meg a jelszódat a folytatáshoz</p>
@@ -209,7 +232,14 @@ function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => vo
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Jelszó" className="form-input" style={{ marginBottom: 8 }} autoFocus />
               {error && <p style={{ color: '#C0614A', fontSize: 12, fontFamily: 'var(--font-montserrat)', fontWeight: 200, marginBottom: 12 }}>{error}</p>}
             </div>
-            <button type="submit" disabled={loading || !password} style={{ width: '100%', background: T.accent, color: T.bgPage, fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '14px 24px', border: 'none', cursor: loading || !password ? 'not-allowed' : 'pointer', opacity: loading || !password ? 0.6 : 1, fontFamily: 'var(--font-montserrat)', marginTop: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 20 }}>
+              <span style={{ width: 14, height: 14, minWidth: 14, borderRadius: 2, border: `1px solid ${rememberMe ? T.accent : T.borderAccent}`, background: rememberMe ? T.accentSubtle : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease', flexShrink: 0 }}>
+                {rememberMe && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4L3 6L7 2" stroke={T.accent} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              </span>
+              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 300, color: T.textMuted }}>Emlékezz rám</span>
+            </label>
+            <button type="submit" disabled={loading || !password} style={{ width: '100%', background: T.accent, color: T.bgPage, fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '14px 24px', border: 'none', cursor: loading || !password ? 'not-allowed' : 'pointer', opacity: loading || !password ? 0.6 : 1, fontFamily: 'var(--font-montserrat)' }}>
               {loading ? '...' : 'Belépés'}
             </button>
           </form>
@@ -222,7 +252,7 @@ function PasswordScreen({ slug, onSuccess }: { slug: string; onSuccess: () => vo
 /* ── Not found ───────────────────────────────────────────────────── */
 function NotFound() {
   return (
-    <div style={{ background: `radial-gradient(ellipse at center, #181510 0%, ${T.bgPage} 70%)`, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ background: `radial-gradient(ellipse at center, var(--dl-bg-elevated) 0%, var(--dl-bg-page) 70%)`, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <p style={{ fontFamily: 'var(--font-playfair)', fontSize: 48, fontWeight: 400, color: T.accentDim, margin: '0 0 16px' }}>404</p>
         <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 13, fontWeight: 200, color: T.textMuted, letterSpacing: '0.1em' }}>Ez a dashboard nem létezik.</p>
@@ -277,7 +307,7 @@ function LeadCard({
         </span>
 
         <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 10, fontWeight: 300, color: T.textMuted, flexShrink: 0, letterSpacing: '0.06em' }}>
-          {sub.status}
+          {statusLabel[sub.status] ?? sub.status}
         </span>
 
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', opacity: 0.4 }}>
@@ -294,7 +324,7 @@ function LeadCard({
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <select
                 value={sub.status}
@@ -302,7 +332,12 @@ function LeadCard({
                 disabled={previewMode}
                 style={{ background: T.bgElevated, border: `1px solid ${T.borderAccent}`, borderRadius: 2, color: 'rgba(237,229,208,0.6)', fontFamily: 'var(--font-montserrat)', fontWeight: 200, fontSize: 11, padding: '6px 10px', cursor: previewMode ? 'not-allowed' : 'pointer', opacity: previewMode ? 0.5 : 1 }}
               >
-                {['New', 'Contacted', 'Converted', 'Not a fit'].map((s) => <option key={s} value={s}>{s}</option>)}
+                {[
+                    ['Új', 'Új'],
+                    ['Kapcsolatba lépett', 'Kapcsolatba lépett'],
+                    ['Szerződött', 'Szerződött'],
+                    ['Nem releváns', 'Nem releváns'],
+                  ].map(([val, label]) => <option key={val} value={val}>{label}</option>)}
               </select>
               {checkmark && (
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -387,6 +422,8 @@ export default function DashboardPage() {
   const params = useParams<{ slug: string }>()
   const slug   = params?.slug ?? ''
 
+  useEffect(() => { document.title = 'Dashboard | Spacio' }, [])
+
   const [authed,   setAuthed]   = useState(false)
   const [checking, setChecking] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -401,8 +438,22 @@ export default function DashboardPage() {
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
   const [notifPref,   setNotifPref]   = useState<'instant' | 'digest'>('instant')
   const [scrapeLoading, setScrapeLoading] = useState(false)
+  const [pricingHourly,   setPricingHourly]   = useState(false)
+  const [pricingFlat,     setPricingFlat]     = useState(false)
+  const [pricingMinimum,  setPricingMinimum]  = useState(false)
+  const [pricingM2,       setPricingM2]       = useState(false)
+  const [pricingHourlyRate,    setPricingHourlyRate]    = useState('')
+  const [pricingFlatRate,      setPricingFlatRate]      = useState('')
+  const [pricingMinimumAmount, setPricingMinimumAmount] = useState('')
+  const [pricingM2Rate,        setPricingM2Rate]        = useState('')
+  const [marketPositioning,    setMarketPositioning]    = useState<string>('')
+  const [pricingSaving, setPricingSaving] = useState(false)
+  const [pricingSaved,  setPricingSaved]  = useState(false)
   const [filter, setFilter] = useState<QualityFilter>('all')
   const [sort,   setSort]   = useState<SortOrder>('newest')
+  const [referralCount,  setReferralCount]  = useState(0)
+  const [monthsEarned,   setMonthsEarned]   = useState(0)
+  const [referralCopied, setReferralCopied] = useState(false)
 
   const appUrl        = typeof window !== 'undefined' ? window.location.origin : ''
   const intakeUrl     = `${appUrl}/a/${slug}`
@@ -424,7 +475,9 @@ export default function DashboardPage() {
         .finally(() => setChecking(false))
       return
     }
-    setAuthed(sessionStorage.getItem(`designlead_auth_${slug}`) === 'true')
+    const authedLocal   = localStorage.getItem(`designlead_auth_${slug}`) === 'true'
+    const authedSession = sessionStorage.getItem(`designlead_auth_${slug}`) === 'true'
+    setAuthed(authedLocal || authedSession)
     setChecking(false)
   }, [slug])
 
@@ -432,13 +485,33 @@ export default function DashboardPage() {
     if (!slug) return
     setLoadingData(true)
     try {
-      const res = await fetch(`/api/dashboard-data?slug=${encodeURIComponent(slug)}`)
+      const password = localStorage.getItem(`designlead_pw_${slug}`) ?? sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
+      const res = await fetch(`/api/dashboard-data?slug=${encodeURIComponent(slug)}`, {
+        headers: { 'x-dashboard-password': password },
+      })
       if (res.status === 404) { setNotFound(true); return }
       if (res.ok) {
         const json = await res.json()
         setSubmissions(json.submissions ?? [])
         setDesigner(json.designer ?? null)
         setNotifPref(json.designer?.notification_preference ?? 'instant')
+        const d = json.designer
+        // Fetch referral stats in parallel
+        fetch(`/api/referral-stats/${encodeURIComponent(slug)}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((rs) => { if (rs) { setReferralCount(rs.referralCount); setMonthsEarned(rs.monthsEarned) } })
+          .catch(() => {})
+        if (d) {
+          setPricingHourly(d.pricing_hourly ?? false)
+          setPricingFlat(d.pricing_flat ?? false)
+          setPricingMinimum(d.pricing_minimum ?? false)
+          setPricingM2(d.pricing_m2 ?? false)
+          setPricingHourlyRate(d.pricing_hourly_rate ? String(d.pricing_hourly_rate) : '')
+          setPricingFlatRate(d.pricing_flat_rate ? String(d.pricing_flat_rate) : '')
+          setPricingMinimumAmount(d.pricing_minimum_amount ? String(d.pricing_minimum_amount) : '')
+          setPricingM2Rate(d.pricing_m2_rate ? String(d.pricing_m2_rate) : '')
+          setMarketPositioning(d.market_positioning ?? '')
+        }
       }
     } catch { /* ignore */ }
     setLoadingData(false)
@@ -449,11 +522,14 @@ export default function DashboardPage() {
   function logout() {
     sessionStorage.removeItem(`designlead_auth_${slug}`)
     sessionStorage.removeItem(`designlead_pw_${slug}`)
+    localStorage.removeItem(`designlead_auth_${slug}`)
+    localStorage.removeItem(`designlead_pw_${slug}`)
     window.location.reload()
   }
 
   async function updateStatus(id: string, newStatus: string) {
-    const res = await fetch(`/api/submissions/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
+    const password = localStorage.getItem(`designlead_pw_${slug}`) ?? sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
+    const res = await fetch(`/api/submissions/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus, slug, password }) })
     if (res.ok) {
       setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s)))
       setCheckmarks((prev) => ({ ...prev, [id]: true }))
@@ -471,9 +547,34 @@ export default function DashboardPage() {
     setScrapeLoading(false)
   }
 
+  async function savePricing() {
+    setPricingSaving(true)
+    const password = localStorage.getItem(`designlead_pw_${slug}`) ?? sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
+    await fetch('/api/designer-settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        password,
+        pricingHourly,
+        pricingFlat,
+        pricingMinimum,
+        pricingM2,
+        pricingHourlyRate: pricingHourly && pricingHourlyRate ? Number(pricingHourlyRate) : null,
+        pricingFlatRate: pricingFlat && pricingFlatRate ? Number(pricingFlatRate) : null,
+        pricingMinimumAmount: pricingMinimum && pricingMinimumAmount ? Number(pricingMinimumAmount) : null,
+        pricingM2Rate: pricingM2 && pricingM2Rate ? Number(pricingM2Rate) : null,
+        marketPositioning: marketPositioning || null,
+      }),
+    })
+    setPricingSaving(false)
+    setPricingSaved(true)
+    setTimeout(() => setPricingSaved(false), 2000)
+  }
+
   async function updateNotifPref(pref: 'instant' | 'digest') {
     setNotifPref(pref)
-    const password = sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
+    const password = localStorage.getItem(`designlead_pw_${slug}`) ?? sessionStorage.getItem(`designlead_pw_${slug}`) ?? ''
     await fetch('/api/designer-settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notificationPreference: pref, slug, password }) })
   }
 
@@ -519,7 +620,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div style={{ background: `radial-gradient(ellipse at center, #181510 0%, ${T.bgPage} 70%)`, minHeight: '100vh', padding: '40px 24px 80px' }}>
+      <div style={{ background: `radial-gradient(ellipse at center, var(--dl-bg-elevated) 0%, var(--dl-bg-page) 70%)`, minHeight: '100vh', padding: '40px 24px 80px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
           {/* Header */}
@@ -528,11 +629,14 @@ export default function DashboardPage() {
               <h1 style={{ fontFamily: 'var(--font-playfair)', fontSize: 28, fontWeight: 400, color: T.textPrimary, margin: '0 0 6px', letterSpacing: '0.02em' }}>Stúdió dashboard</h1>
               {studioName && <p style={{ fontFamily: 'var(--font-montserrat)', fontWeight: 200, fontSize: 12, color: T.textMuted, letterSpacing: '0.1em', margin: 0 }}>{studioName}</p>}
             </div>
-            {!previewMode && (
-              <button onClick={logout} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-montserrat)', fontSize: 10, fontWeight: 300, letterSpacing: '0.14em', color: T.textMuted, cursor: 'pointer', textTransform: 'uppercase', padding: 0 }}>
-                Kilépés
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ThemeToggle />
+              {!previewMode && (
+                <button onClick={logout} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-montserrat)', fontSize: 10, fontWeight: 300, letterSpacing: '0.14em', color: T.textMuted, cursor: 'pointer', textTransform: 'uppercase', padding: 0 }}>
+                  Kilépés
+                </button>
+              )}
+            </div>
           </div>
           <div style={{ height: 1, background: 'linear-gradient(90deg, rgba(184,147,90,0.4) 0%, transparent 70%)', marginBottom: 40 }} />
 
@@ -581,6 +685,38 @@ export default function DashboardPage() {
 
               {!previewMode && (
                 <>
+                  {/* Referrals */}
+                  <div style={{ marginBottom: 48 }}>
+                    <SectionHeader label="Referrals" />
+                    <div style={{ background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, padding: '24px 28px', maxWidth: 620 }}>
+                      <div style={{ marginBottom: 20 }}>
+                        <p style={{ ...labelStyle, margin: '0 0 8px' }}>Your referral link</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ background: T.bgElevated, border: `1px solid ${T.accent}`, borderRadius: 2, padding: '9px 12px', flex: 1, overflow: 'hidden' }}>
+                            <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: T.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                              {`${appUrl}/onboard?ref=${slug}`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try { await navigator.clipboard.writeText(`${appUrl}/onboard?ref=${slug}`); setReferralCopied(true); setTimeout(() => setReferralCopied(false), 2000) } catch { /* ignore */ }
+                            }}
+                            style={{ background: referralCopied ? 'rgba(138,158,140,0.15)' : 'transparent', border: `1px solid ${referralCopied ? 'rgba(138,158,140,0.5)' : T.accent}`, color: referralCopied ? '#8A9E8C' : T.accent, borderRadius: 2, padding: '7px 14px', fontFamily: 'var(--font-montserrat)', fontSize: 9, fontWeight: 400, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}
+                          >
+                            {referralCopied ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 13, fontWeight: 200, color: T.textPrimary, margin: '0 0 12px' }}>
+                        {referralCount} designer{referralCount !== 1 ? 's' : ''} referred · {monthsEarned} free month{monthsEarned !== 1 ? 's' : ''} earned
+                      </p>
+                      <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: T.textMuted, margin: 0, lineHeight: 1.7 }}>
+                        Share your link with other interior designers. When they join and subscribe, you earn 1 free month — and they get 50% off their first month.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Share & Embed */}
                   <div style={{ marginBottom: 48 }}>
                     <SectionHeader label="Megosztás és beágyazás" />
@@ -632,6 +768,68 @@ export default function DashboardPage() {
                           </label>
                         )
                       })}
+                    </div>
+                  </div>
+
+                  {/* Pricing settings */}
+                  <div id="pricing-settings" style={{ marginBottom: 48 }}>
+                    <SectionHeader label="Árazási struktúra" />
+                    <div style={{ background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, padding: '24px 28px', maxWidth: 560 }}>
+                      <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: T.textMuted, margin: '0 0 20px', lineHeight: 1.6 }}>
+                        Ezekkel az adatokkal az AI pontosabb árajánlat-irányt tud adni az ügyfeleid projektjeire.
+                      </p>
+
+                      {/* Pricing checkboxes */}
+                      {([
+                        { key: 'hourly',   label: 'Óradíj alapú',     checked: pricingHourly,   setChecked: setPricingHourly,   rate: pricingHourlyRate,    setRate: setPricingHourlyRate,    placeholder: 'Óradíj (Ft/óra)' },
+                        { key: 'flat',     label: 'Fix projektdíj',   checked: pricingFlat,     setChecked: setPricingFlat,     rate: pricingFlatRate,      setRate: setPricingFlatRate,      placeholder: 'Tipikus fix díj (Ft)' },
+                        { key: 'minimum',  label: 'Projekt minimum',  checked: pricingMinimum,  setChecked: setPricingMinimum,  rate: pricingMinimumAmount, setRate: setPricingMinimumAmount, placeholder: 'Minimum projektdíj (Ft)' },
+                        { key: 'm2',       label: 'Négyzetméter alapú', checked: pricingM2,     setChecked: setPricingM2,       rate: pricingM2Rate,        setRate: setPricingM2Rate,        placeholder: 'Négyzetméter díj (Ft/m²)' },
+                      ] as { key: string; label: string; checked: boolean; setChecked: (v: boolean) => void; rate: string; setRate: (v: string) => void; placeholder: string }[]).map((item) => (
+                        <div key={item.key} style={{ marginBottom: 12 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: item.checked ? 8 : 0 }}>
+                            <span style={{ width: 14, height: 14, minWidth: 14, borderRadius: 2, border: `1px solid ${item.checked ? T.accent : T.borderAccent}`, background: item.checked ? T.accentSubtle : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease', flexShrink: 0 }}>
+                              {item.checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 4L3 6L7 2" stroke={T.accent} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                            </span>
+                            <input type="checkbox" checked={item.checked} onChange={(e) => item.setChecked(e.target.checked)} style={{ display: 'none' }} />
+                            <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 13, fontWeight: 200, color: item.checked ? T.textPrimary : 'rgba(237,229,208,0.55)', transition: 'color 0.2s ease' }}>{item.label}</span>
+                          </label>
+                          {item.checked && (
+                            <input
+                              type="number" min={0} value={item.rate}
+                              onChange={(e) => item.setRate(e.target.value)}
+                              placeholder={item.placeholder}
+                              style={{ background: T.bgElevated, border: `1px solid ${T.borderAccent}`, borderRadius: 2, color: T.textPrimary, fontFamily: 'var(--font-montserrat)', fontWeight: 200, fontSize: 13, padding: '9px 12px', width: '100%', outline: 'none', marginLeft: 24 }}
+                            />
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Market positioning */}
+                      <div style={{ marginTop: 20, marginBottom: 20 }}>
+                        <p style={{ ...labelStyle, margin: '0 0 10px' }}>Hogyan pozicionálod magad a piacon?</p>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {([
+                            { value: 'budget',  label: 'Megfizethető' },
+                            { value: 'mid',     label: 'Középkategória' },
+                            { value: 'premium', label: 'Prémium' },
+                            { value: 'luxury',  label: 'Luxus' },
+                          ]).map((opt) => {
+                            const active = marketPositioning === opt.value
+                            return (
+                              <button key={opt.value} type="button" onClick={() => setMarketPositioning(active ? '' : opt.value)}
+                                style={{ background: active ? T.accentSubtle : 'transparent', border: `1px solid ${active ? T.accent : T.borderAccent}`, color: active ? T.accent : T.textMuted, borderRadius: 2, padding: '7px 14px', fontFamily: 'var(--font-montserrat)', fontSize: 10, fontWeight: 300, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                {opt.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <button onClick={savePricing} disabled={pricingSaving}
+                        style={{ background: T.accent, color: T.bgPage, border: 'none', borderRadius: 2, padding: '10px 20px', fontFamily: 'var(--font-montserrat)', fontSize: 10, fontWeight: 400, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: pricingSaving ? 'not-allowed' : 'pointer', opacity: pricingSaving ? 0.7 : 1 }}>
+                        {pricingSaved ? 'Mentve ✓' : pricingSaving ? 'Mentés…' : 'Mentés'}
+                      </button>
                     </div>
                   </div>
 

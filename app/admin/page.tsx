@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import SpacioLogo from '@/components/SpacioLogo'
 
 /* ── Types ──────────────────────────────────────────────────────── */
 type ServiceStatus = { status: 'ok' | 'degraded' | 'failing'; label: string; detail?: string }
@@ -25,6 +26,8 @@ type Designer = {
   archived_at: string | null
   portfolio_scrape_status: string | null
   submission_count: number
+  referred_by: string | null
+  referral_months_earned: number
 }
 
 type Submission = {
@@ -153,7 +156,7 @@ function AdminPasswordScreen({ onSuccess }: { onSuccess: (pw: string) => void })
             Admin
           </h1>
           <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 11, fontWeight: 200, color: MUTED, letterSpacing: '0.12em', marginBottom: 32 }}>
-            DesignLead operator console
+            Spacio operator console
           </p>
           <form onSubmit={handleSubmit} noValidate>
             <div className={shake ? 'dl-shake' : ''}>
@@ -574,8 +577,15 @@ function DesignerDrawer({
   const [briefModal, setBriefModal] = useState<string | null>(null)
   const [overrideModal, setOverrideModal] = useState<Submission | null>(null)
   const [expandedActivity, setExpandedActivity] = useState<Set<string>>(new Set())
+  const [referralCount, setReferralCount] = useState<number | null>(null)
 
   useEffect(() => {
+    if (referralCount === null) {
+      fetch(`/api/referral-stats/${encodeURIComponent(designer.slug)}`, { headers: adminHeaders(adminPassword) })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d) setReferralCount(d.referralCount) })
+        .catch(() => {})
+    }
     if (tab === 'submissions' && submissions.length === 0) {
       setLoadingSubs(true)
       fetch(`/api/admin/designers/${designer.slug}/submissions`, { headers: adminHeaders(adminPassword) })
@@ -592,7 +602,7 @@ function DesignerDrawer({
         .catch(() => {})
         .finally(() => setLoadingActivity(false))
     }
-  }, [tab, designer.slug, adminPassword, submissions.length, activity.length])
+  }, [tab, designer.slug, adminPassword, submissions.length, activity.length, referralCount])
 
   async function saveField(field: string, value: unknown) {
     await fetch(`/api/admin/designers/${designer.slug}`, {
@@ -716,6 +726,20 @@ function DesignerDrawer({
                   <PlanBadge isPaid={designer.is_paid} />
                   <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 10, color: MUTED, fontWeight: 200 }}>
                     (use Toggle Plan action to change)
+                  </span>
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(201,169,110,0.1)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ ...labelStyle, marginBottom: 4, fontSize: 8 }}>Referrals</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: BODY }}>
+                    Referred by: <span style={{ color: MUTED }}>{designer.referred_by ?? '—'}</span>
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: BODY }}>
+                    Referrals made: <span style={{ color: MUTED }}>{referralCount ?? '…'}</span>
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-montserrat)', fontSize: 12, fontWeight: 200, color: BODY }}>
+                    Free months earned: <span style={{ color: MUTED }}>{designer.referral_months_earned ?? 0}</span>
                   </span>
                 </div>
               </div>
@@ -1168,6 +1192,8 @@ function AdminSubmissionsTable({
 
 /* ── Main admin page ────────────────────────────────────────────── */
 export default function AdminPage() {
+  useEffect(() => { document.title = 'Admin | Spacio' }, [])
+
   const [authed, setAuthed] = useState(false)
   const [checking, setChecking] = useState(true)
   const [adminPassword, setAdminPassword] = useState('')
@@ -1224,6 +1250,9 @@ export default function AdminPage() {
 
   return (
     <div style={{ background: 'radial-gradient(ellipse at center, #141414 0%, #0A0A0A 70%)', minHeight: '100vh', padding: '40px 24px 80px' }}>
+      <div style={{ position: 'fixed', top: 24, left: 32, zIndex: 200 }}>
+        <SpacioLogo height={130} />
+      </div>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
         {/* Header */}
@@ -1233,7 +1262,7 @@ export default function AdminPage() {
               Admin
             </h1>
             <p style={{ fontFamily: 'var(--font-montserrat)', fontSize: 11, fontWeight: 200, color: MUTED, letterSpacing: '0.14em', margin: 0, textTransform: 'uppercase' }}>
-              DesignLead operator console
+              Spacio operator console
             </p>
           </div>
           <button

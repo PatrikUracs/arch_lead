@@ -1,19 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 /* ── CSS tokens ──────────────────────────────────────────────────── */
 const T = {
-  bgPage:       '#0F0D0A',
-  bgCard:       '#181510',
-  bgElevated:   '#1A1710',
-  accent:       '#B8935A',
-  accentDim:    'rgba(184,147,90,0.3)',
-  accentSubtle: 'rgba(184,147,90,0.12)',
-  textPrimary:  '#EDE5D0',
-  textMuted:    'rgba(237,229,208,0.35)',
-  borderDefault:'rgba(255,255,255,0.05)',
-  borderAccent: 'rgba(184,147,90,0.2)',
+  bgPage:       'var(--dl-bg-page)',
+  bgCard:       'var(--dl-bg-card)',
+  bgElevated:   'var(--dl-bg-elevated)',
+  accent:       'var(--dl-accent)',
+  accentDim:    'var(--dl-accent-dim)',
+  accentSubtle: 'var(--dl-accent-subtle)',
+  textPrimary:  'var(--dl-text-primary)',
+  textMuted:    'var(--dl-text-muted)',
+  borderDefault:'var(--dl-border-default)',
+  borderAccent: 'var(--dl-border-accent)',
 }
 
 /* ── Types ───────────────────────────────────────────────────────── */
@@ -25,7 +25,7 @@ type FormData = {
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
-type SuccessData = { slug: string; intakeUrl: string; dashboardUrl: string; password: string }
+type SuccessData = { slug: string; intakeUrl: string; dashboardUrl: string; password: string; referredByName: string | null }
 
 /* ── Password strength ───────────────────────────────────────────── */
 type Strength = 'none' | 'weak' | 'fair' | 'strong'
@@ -44,14 +44,14 @@ const STRENGTH_LABEL: Record<Strength, string>  = { none: '', weak: 'Gyenge', fa
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <label htmlFor={htmlFor} style={{ display: 'block', fontSize: 10, fontWeight: 300, letterSpacing: '0.14em', color: 'rgba(237,229,208,0.6)', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'var(--font-montserrat)' }}>
+    <label htmlFor={htmlFor} style={{ display: 'block', fontSize: 10, fontWeight: 300, letterSpacing: '0.14em', color: 'var(--dl-text-primary, #1a1a1a)', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'var(--font-montserrat)' }}>
       {children}
     </label>
   )
 }
 
 function FieldHint({ children }: { children: React.ReactNode }) {
-  return <p style={{ color: T.textMuted, fontSize: 12, marginTop: 6, fontFamily: 'var(--font-montserrat)', fontWeight: 200, lineHeight: 1.5 }}>{children}</p>
+  return <p style={{ color: 'var(--dl-text-muted, #555555)', fontSize: 12, marginTop: 6, fontFamily: 'var(--font-montserrat)', fontWeight: 200, lineHeight: 1.5 }}>{children}</p>
 }
 
 function SectionRule() {
@@ -80,6 +80,16 @@ function UrlRow({ label, value }: { label: string; value: string }) {
         </div>
         <CopyButton value={value} />
       </div>
+    </div>
+  )
+}
+
+/* ── Progress bar ────────────────────────────────────────────────── */
+function ProgressBar({ current }: { current: number }) {
+  const pct = Math.round((current / 3) * 100)
+  return (
+    <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', width: '100%' }}>
+      <div style={{ height: '100%', width: `${pct}%`, background: 'var(--dl-accent)', transition: 'width 0.3s ease' }} />
     </div>
   )
 }
@@ -158,6 +168,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
 /* ── Main ────────────────────────────────────────────────────────── */
 export default function OnboardForm() {
   const [step, setStep] = useState(1)
+  const [refSlug, setRefSlug] = useState<string | null>(null)
   const [form, setForm] = useState<FormData>({
     name: '', email: '', studioName: '', portfolioUrl: '', bio: '',
     responseTone: '', styleKeywords: '', typicalProjectSize: '', ratePerSqm: '',
@@ -169,6 +180,12 @@ export default function OnboardForm() {
   const [status, setStatus]     = useState<Status>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) setRefSlug(ref)
+  }, [])
 
   const strength = getStrength(form.password)
 
@@ -203,6 +220,7 @@ export default function OnboardForm() {
           ratePerSqm: form.ratePerSqm || undefined, bio: form.bio || undefined,
           responseTone: form.responseTone || undefined, calendlyUrl: form.calendlyUrl || undefined,
           password: form.password,
+          ref: refSlug || undefined,
         }),
       })
       if (!res.ok) {
@@ -211,7 +229,7 @@ export default function OnboardForm() {
         throw new Error(message)
       }
       const data = await res.json()
-      setSuccessData({ slug: data.slug, intakeUrl: data.intakeUrl, dashboardUrl: data.dashboardUrl, password: form.password })
+      setSuccessData({ slug: data.slug, intakeUrl: data.intakeUrl, dashboardUrl: data.dashboardUrl, password: form.password, referredByName: data.referredByName ?? null })
       setStatus('success')
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Valami hiba történt.')
@@ -219,8 +237,8 @@ export default function OnboardForm() {
     }
   }
 
-  const pageStyle: React.CSSProperties = { background: `radial-gradient(ellipse at center, #181510 0%, ${T.bgPage} 70%)`, minHeight: '100vh' }
-  const cardStyle: React.CSSProperties = { background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, width: '100%', maxWidth: 600 }
+  const pageStyle: React.CSSProperties = { background: `radial-gradient(ellipse at center, var(--dl-bg-elevated) 0%, var(--dl-bg-page) 70%)`, minHeight: '100vh' }
+  const cardStyle: React.CSSProperties = { background: T.bgCard, border: `1px solid ${T.borderAccent}`, borderRadius: 6, width: '100%', maxWidth: 600, overflow: 'hidden' }
 
   /* ── Success ─────────────────────────────────────────────────────── */
   if (status === 'success' && successData) {
@@ -236,9 +254,14 @@ export default function OnboardForm() {
           <h2 style={{ fontFamily: 'var(--font-playfair)', fontSize: 24, fontWeight: 400, color: T.textPrimary, marginBottom: 8, letterSpacing: '0.02em', textAlign: 'center' }}>
             Élő vagy
           </h2>
-          <p style={{ color: T.textMuted, fontSize: 13, lineHeight: 1.7, textAlign: 'center', fontFamily: 'var(--font-montserrat)', fontWeight: 200, marginBottom: 36 }}>
+          <p style={{ color: T.textMuted, fontSize: 13, lineHeight: 1.7, textAlign: 'center', fontFamily: 'var(--font-montserrat)', fontWeight: 200, marginBottom: successData.referredByName ? 12 : 36 }}>
             Ezt a linket küldd az ügyfeleidnek. Innen kezeled a leadjeidet. Mentsd el mindkét linket.
           </p>
+          {successData.referredByName && (
+            <p style={{ color: T.textMuted, fontSize: 12, lineHeight: 1.6, textAlign: 'center', fontFamily: 'var(--font-montserrat)', fontWeight: 300, marginBottom: 36 }}>
+              You were referred by {successData.referredByName}
+            </p>
+          )}
           <div style={{ marginBottom: 28 }}>
             <UrlRow label="Ügyfél-intake link" value={successData.intakeUrl} />
             <UrlRow label="A dashboardod"      value={successData.dashboardUrl} />
@@ -265,6 +288,8 @@ export default function OnboardForm() {
   return (
     <div style={pageStyle} className="flex items-center justify-center px-4 py-16">
       <div style={cardStyle}>
+
+        <ProgressBar current={step} />
 
         <div className="card-header" style={{ textAlign: 'center' }}>
           <h1 style={{ fontFamily: 'var(--font-playfair)', fontSize: 32, fontWeight: 400, letterSpacing: '0.02em', color: T.textPrimary, margin: '0 0 8px', lineHeight: 1.1 }}>
@@ -298,11 +323,12 @@ export default function OnboardForm() {
                   <div>
                     <FieldLabel htmlFor="studioName">Stúdió neve</FieldLabel>
                     <input id="studioName" name="studioName" type="text" value={form.studioName} onChange={handleChange} placeholder="pl. Kovács Anna Belsőépítész Stúdió" className="form-input" />
-                    <FieldHint>Megjelenik az e-mail tárgyában és az ügyfél eredményoldalán. Ebből generálódik az egyedi URL-ed.</FieldHint>
+                    <FieldHint>Ebből generálódik az egyedi URL-ed — pl. kovacs-anna-design → spacio-ai.net/a/kovacs-anna-design</FieldHint>
                   </div>
                   <div>
                     <FieldLabel htmlFor="portfolioUrl">Portfólió URL</FieldLabel>
                     <input id="portfolioUrl" name="portfolioUrl" type="url" value={form.portfolioUrl} onChange={handleChange} placeholder="https://portfoliod.hu" className="form-input" />
+                    <FieldHint>Az AI ebből tanulja meg a stílusodat</FieldHint>
                   </div>
                   <div>
                     <FieldLabel htmlFor="bio">Rövid bemutatkozó <span style={{ color: T.accentDim, textTransform: 'none', letterSpacing: 0, fontWeight: 200 }}>(opcionális)</span></FieldLabel>
@@ -327,7 +353,7 @@ export default function OnboardForm() {
                     <FieldHint>Milyen stílusban szóljon az AI az ügyfeleidhez?</FieldHint>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                       {[
-                        { value: 'warm',         label: 'Meleg és személyes',        desc: 'Barátságos, az ügyfél nevét gyakran használja' },
+                        { value: 'warm',         label: 'Kedves és személyes',       desc: 'Barátságos, az ügyfél nevét gyakran használja' },
                         { value: 'professional', label: 'Professzionális és tömör', desc: 'Üzletszerű, közvetlen, lényegre törő' },
                         { value: 'enthusiastic', label: 'Lelkes és design-fókuszú',  desc: 'Szenvedélyes, kifejező, kreatív' },
                       ].map((opt) => (

@@ -40,5 +40,9 @@ export async function POST(req: NextRequest) {
   }
 
   const match = await bcrypt.compare(password, data.dashboard_password_hash)
-  return NextResponse.json({ ok: match })
+  if (!match) {
+    await new Promise((r) => setTimeout(r, 1500))
+    return NextResponse.json({ ok: false }, { status: 401 })
+  }
+  return NextResponse.json({ ok: true })
 }

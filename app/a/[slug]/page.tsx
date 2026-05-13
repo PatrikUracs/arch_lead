@@ -1,7 +1,16 @@
+import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import IntakeForm from '@/components/IntakeForm'
+import SpacioLogo from '@/components/SpacioLogo'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { title: 'Spacio' }
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const { data } = await supabase.from('designers').select('studio_name, name').eq('slug', params.slug).is('archived_at', null).maybeSingle()
+  return { title: data?.studio_name || data?.name || 'Spacio' }
+}
 
 function NotFound() {
   return (
@@ -36,7 +45,10 @@ export default async function DesignerIntakePage({ params }: { params: { slug: s
   if (!designer) return <NotFound />
 
   return (
-    <main>
+    <main style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 24, left: 32, zIndex: 100 }}>
+        <SpacioLogo height={130} />
+      </div>
       <IntakeForm designer={{ slug: designer.slug, name: designer.name, studio_name: designer.studio_name }} />
     </main>
   )

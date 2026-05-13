@@ -6,11 +6,13 @@ type WindowEntry = { count: number; resetAt: number }
 const windows = new Map<string, WindowEntry>()
 
 const LIMITS: Record<string, { max: number; windowMs: number }> = {
-  '/api/submit':         { max: 5,  windowMs: 60_000 },
-  '/api/upload':         { max: 10, windowMs: 60_000 },
-  '/api/onboard':        { max: 3,  windowMs: 3_600_000 },
-  '/api/dashboard-auth': { max: 10, windowMs: 60_000 },
-  '/api/admin/auth':     { max: 5,  windowMs: 60_000 },
+  '/api/submit':            { max: 5,  windowMs: 60_000 },
+  '/api/upload':            { max: 10, windowMs: 60_000 },
+  '/api/onboard':           { max: 3,  windowMs: 3_600_000 },
+  '/api/dashboard-auth':    { max: 10, windowMs: 60_000 },
+  '/api/dashboard-data':    { max: 30, windowMs: 60_000 },
+  '/api/designer-settings': { max: 10, windowMs: 60_000 },
+  '/api/admin/auth':        { max: 5,  windowMs: 60_000 },
 }
 
 function getIp(req: NextRequest): string {
@@ -50,5 +52,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/submit', '/api/upload', '/api/onboard', '/api/dashboard-auth', '/api/admin/auth'],
+  matcher: ['/api/submit', '/api/upload', '/api/onboard', '/api/dashboard-auth', '/api/dashboard-data', '/api/designer-settings', '/api/admin/auth'],
 }

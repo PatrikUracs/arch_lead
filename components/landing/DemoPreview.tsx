@@ -79,18 +79,6 @@ export default function DemoPreview() {
 
   return (
     <section id="spacio-demo" className="demo-section">
-      <div style={{
-        background: '#B8935A',
-        color: '#0F0D0A',
-        padding: '32px',
-        fontSize: '24px',
-        fontWeight: 700,
-        textAlign: 'center' as const,
-        position: 'relative' as const,
-        zIndex: 9999,
-      }}>
-        ★ DEMO SECTION IS HERE ★
-      </div>
       <div className="demo-wrap">
 
         <div className="demo-header">

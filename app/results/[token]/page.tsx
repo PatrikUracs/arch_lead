@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { RENDERS_ENABLED } from '@/lib/flags'
+import SpacioLogo from '@/components/SpacioLogo'
 
 type SubmissionData = {
   id: string
@@ -11,7 +12,6 @@ type SubmissionData = {
   room_type: string
   design_style: string
   brief: string | null
-  results_page_token: string
 }
 
 type DesignerData = {
@@ -25,19 +25,6 @@ type ResultsData = {
   designer: DesignerData | null
 }
 
-const DL = {
-  '--dl-bg-page':        '#0F0D0A',
-  '--dl-bg-card':        '#181510',
-  '--dl-bg-elevated':    '#1A1710',
-  '--dl-accent':         '#B8935A',
-  '--dl-accent-dim':     'rgba(184, 147, 90, 0.3)',
-  '--dl-accent-subtle':  'rgba(184, 147, 90, 0.12)',
-  '--dl-text-primary':   '#EDE5D0',
-  '--dl-text-muted':     'rgba(237, 229, 208, 0.35)',
-  '--dl-border-default': 'rgba(255, 255, 255, 0.05)',
-  '--dl-border-accent':  'rgba(184, 147, 90, 0.2)',
-  '--dl-rule-gradient':  'linear-gradient(90deg, rgba(184,147,90,0.4) 0%, transparent 70%)',
-} as React.CSSProperties
 
 /* ── Extract first 2 sections from brief ───────────────────────── */
 function extractBriefSections(brief: string): { label: string; content: string }[] {
@@ -85,7 +72,7 @@ function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={url} alt="Concept full size"
+        src={url} alt="Koncept teljes méretben"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', cursor: 'default', borderRadius: 2 }}
       />
@@ -99,11 +86,13 @@ export default function ResultsPage() {
   const params = useParams()
   const token = params?.token as string
 
+  useEffect(() => { document.title = 'Your Results | Spacio' }, [])
+
   const [data, setData] = useState<ResultsData | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
-  const bgStyle: React.CSSProperties = { ...DL, background: 'var(--dl-bg-page)', minHeight: '100vh' }
+  const bgStyle: React.CSSProperties = { background: 'var(--dl-bg-page)', minHeight: '100vh' }
 
   const fetchData = useCallback(async () => {
     try {
@@ -166,7 +155,7 @@ export default function ResultsPage() {
   /* ── Failed ─────────────────────────────────────────────────────── */
   // RENDERS_ENABLED: re-enable when Replicate integration is restored (Phase X)
   if (RENDERS_ENABLED && data.submission.render_status === 'failed') {
-    const dn = data.designer?.name ?? 'The designer'
+    const dn = data.designer?.name ?? 'A tervező'
     return (
       <div style={bgStyle} className="flex items-center justify-center px-4 py-16">
         <div style={{ background: 'var(--dl-bg-card)', border: '1px solid var(--dl-border-default)', borderRadius: 6, padding: '64px 48px', maxWidth: 480, width: '100%', textAlign: 'center' }}>
@@ -188,6 +177,9 @@ export default function ResultsPage() {
 
   return (
     <div style={bgStyle} className="px-4 py-16">
+      <div style={{ position: 'fixed', top: 24, left: 32, zIndex: 200 }}>
+        <SpacioLogo height={130} />
+      </div>
       {lightboxUrl && <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
@@ -213,7 +205,7 @@ export default function ResultsPage() {
             {renderUrls.map((url, i) => (
               <div key={i} style={{ position: 'relative', cursor: 'zoom-in' }} onClick={() => setLightboxUrl(url)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Concept ${i + 1}`} style={{ width: '100%', display: 'block', border: '1px solid var(--dl-border-accent)', borderRadius: 2 }} />
+                <img src={url} alt={`Koncept ${i + 1}`} style={{ width: '100%', display: 'block', border: '1px solid var(--dl-border-accent)', borderRadius: 2 }} />
               </div>
             ))}
           </div>
@@ -257,7 +249,7 @@ export default function ResultsPage() {
             href={designer.calendly_url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: 'block', width: '100%', background: 'var(--dl-accent)', color: '#0F0D0A', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: 'pointer', textAlign: 'center', fontFamily: 'var(--font-montserrat)', textDecoration: 'none', boxSizing: 'border-box' }}
+            style={{ display: 'block', width: '100%', background: 'var(--dl-accent)', color: 'var(--dl-bg-page)', fontWeight: 400, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', borderRadius: 2, padding: '16px 24px', border: 'none', cursor: 'pointer', textAlign: 'center', fontFamily: 'var(--font-montserrat)', textDecoration: 'none', boxSizing: 'border-box' }}
           >
             Tetszik — foglalj időpontot {designerName} designerrel
           </a>

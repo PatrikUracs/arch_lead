@@ -1,504 +1,618 @@
+'use client'
+import { useRef } from 'react'
+import { motion, useInView } from 'framer-motion'
 import Link from 'next/link'
+import SpacioLogo from '@/components/SpacioLogo'
+import dynamic from 'next/dynamic'
+const DemoPreview = dynamic(
+  () => import('@/components/landing/DemoPreview'),
+  { ssr: false, loading: () => null }
+)
+import ThemeToggle from '@/components/ThemeToggle'
+
+const EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1]
+const DUR = 0.6
+
+const scrollFade = (inView: boolean, delay = 0) => ({
+  initial: { opacity: 0, y: 24 },
+  animate: inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 },
+  transition: { duration: DUR, ease: EASE, delay },
+})
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0,
+    transition: { duration: DUR, ease: EASE, delay: i * 0.12 },
+  }),
+}
 
 export default function RootPage() {
+  const howRef = useRef(null)
+  const howInView = useInView(howRef, { once: true, amount: 0.15 })
+  const featRef = useRef(null)
+  const featInView = useInView(featRef, { once: true, amount: 0.15 })
+  const pricingRef = useRef(null)
+  const pricingInView = useInView(pricingRef, { once: true, amount: 0.15 })
+
   return (
-    <div style={{ ['--dl-accent' as string]: '#B8935A' }}>
+    <div>
       <style>{`
-        :root {
-          --dl-bg-page: #0F0D0A;
-          --dl-bg-card: #181510;
-          --dl-bg-elevated: #1A1710;
-          --dl-accent: #B8935A;
-          --dl-accent-dim: rgba(184,147,90,0.3);
-          --dl-accent-subtle: rgba(184,147,90,0.12);
-          --dl-text-primary: #EDE5D0;
-          --dl-text-muted: rgba(237,229,208,0.35);
-          --dl-border-default: rgba(255,255,255,0.05);
-          --dl-border-accent: rgba(184,147,90,0.2);
-        }
-        @media (prefers-color-scheme: light) {
-          :root {
-            --dl-bg-page: #FAF7F2;
-            --dl-bg-card: #FFFFFF;
-            --dl-bg-elevated: #FAF7F2;
-            --dl-text-primary: #1A1510;
-            --dl-text-muted: rgba(26,21,16,0.45);
-            --dl-border-default: rgba(184,147,90,0.2);
-            --dl-border-accent: rgba(184,147,90,0.2);
-          }
-        }
-        .landing-body {
-          font-family: 'Montserrat', sans-serif;
-          background-color: var(--dl-bg-page);
-          color: var(--dl-text-primary);
-          margin: 0;
-        }
-        .playfair { font-family: 'Playfair Display', serif; }
-        .section-rule {
-          height: 1px;
-          background: linear-gradient(90deg, rgba(184,147,90,0.4) 0%, transparent 70%);
-          margin-bottom: 2.5rem;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .lb { font-family: 'Montserrat', sans-serif; background: transparent; color: var(--dl-text-primary); }
+        .pf { font-family: 'Playfair Display', serif; }
+        .rule { height: 1px; background: var(--dl-rule-gradient); margin-bottom: 32px; }
+
         .nav-cta {
-          font-family: Montserrat, sans-serif;
-          font-weight: 400;
-          font-size: 0.8125rem;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: #FFEAAA;
-          border: 1px solid rgba(255,234,170,0.4);
-          border-radius: 2px;
-          padding: 0.5rem 1.25rem;
-          text-decoration: none;
-          transition: border-color 0.2s ease, background 0.2s ease;
+          font-family:'Montserrat',sans-serif; font-weight:400; font-size:11px;
+          letter-spacing:.14em; text-transform:uppercase; color:var(--dl-accent);
+          border:1px solid var(--dl-accent-dim); border-radius:2px; padding:8px 16px;
+          text-decoration:none; transition:border-color .2s ease,background .2s ease;
         }
-        .nav-cta:hover {
-          border-color: #FFEAAA;
-          background: rgba(255,234,170,0.08);
+        .nav-cta:hover { border-color:var(--dl-accent); background:var(--dl-accent-subtle); }
+
+        .hero-cta {
+          font-family:'Montserrat',sans-serif; font-weight:400; font-size:11px;
+          letter-spacing:.2em; text-transform:uppercase; color:var(--dl-accent);
+          background:transparent; border:1px solid var(--dl-accent); border-radius:2px;
+          padding:12px 32px; text-decoration:none; display:inline-block;
+          transition:background .2s ease,color .2s ease;
+        }
+        .hero-cta:hover { background:var(--dl-accent); color:var(--dl-bg-page); }
+
+        .feat-card {
+          background:var(--dl-bg-card); border:1px solid var(--dl-border-default);
+          border-left:2px solid var(--dl-accent); border-radius:6px; padding:32px;
+          transition:border-color .2s ease,background .2s ease;
+        }
+        .feat-card:hover { background:var(--dl-bg-elevated); border-color:var(--dl-border-accent); border-left-color:var(--dl-accent); }
+
+        .price-card {
+          background:var(--dl-bg-card); border-radius:6px; padding:32px;
+          transition:border-color .2s ease;
+        }
+        .price-alap { border:1px solid var(--dl-accent); }
+        .price-iroda { border:1px solid var(--dl-border-default); }
+        .price-alap:hover,.price-iroda:hover { border-color:var(--dl-border-accent); }
+        .price-alap:hover { border-color:var(--dl-accent); }
+
+        .price-cta-alap {
+          font-family:'Montserrat',sans-serif; font-weight:400; font-size:11px;
+          letter-spacing:.14em; text-transform:uppercase; color:var(--dl-bg-page);
+          background:var(--dl-accent); border:none; border-radius:2px; padding:10px 20px;
+          text-decoration:none; display:inline-block;
+          transition:background .2s ease;
+        }
+        .price-cta-alap:hover { background:var(--dl-accent-dim); }
+        .price-cta-iroda {
+          font-family:'Montserrat',sans-serif; font-weight:400; font-size:11px;
+          letter-spacing:.14em; text-transform:uppercase; color:var(--dl-accent);
+          background:transparent; border:1px solid var(--dl-accent-dim); border-radius:2px;
+          padding:10px 20px; text-decoration:none; display:inline-block;
+          transition:border-color .2s ease,background .2s ease;
+        }
+        .price-cta-iroda:hover { border-color:var(--dl-accent); background:var(--dl-accent-subtle); }
+
+        @media (max-width: 768px) {
+          .hero-text { max-width: 100% !important; }
+          .nav-wrap { padding: 24px 24px !important; }
+          .section-wrap { padding: 48px 24px !important; }
+          .step-grid { grid-template-columns: 1fr !important; }
+          .feat-grid { grid-template-columns: 1fr !important; }
+          .testi-grid { grid-template-columns: 1fr !important; }
+          .price-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <div className="landing-body">
-        {/* Nav */}
+      <div className="lb">
+
+        {/* ── Nav ─────────────────────────────────────────────────── */}
         <nav style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
+          position: 'relative',
+          zIndex: 50,
+          background: 'var(--dl-bg-page)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '1.5rem 2rem',
+          padding: '16px 24px',
+          animation: 'nav-in 600ms var(--ease) 100ms both',
         }}>
-          <span className="playfair" style={{ fontSize: '1.375rem', color: '#FFEAAA', letterSpacing: '0.02em' }}>
-            DesignLead
-          </span>
-          <Link href="/onboard" className="nav-cta">
-            Regisztráció
-          </Link>
+          <div style={{ alignSelf: 'flex-start', marginTop: '-5px' }}>
+            <SpacioLogo height={130} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <a href="/dashboard" style={{
+              fontFamily: 'var(--font-montserrat)',
+              fontSize: 13,
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase' as const,
+              textDecoration: 'none',
+              color: 'var(--dl-text-muted)',
+              whiteSpace: 'nowrap' as const,
+              padding: '14px 4px',
+            }}>
+              Bejelentkezés
+            </a>
+            <div style={{ width: 1, height: 16, background: 'var(--dl-border-default)', margin: '0 12px' }} />
+            <a href="/onboard" className="nav-link" style={{
+              background: 'transparent',
+              border: '1px solid var(--dl-accent)',
+              color: 'var(--dl-accent)',
+              borderRadius: 2,
+              padding: '14px 28px',
+              fontFamily: 'var(--font-montserrat)',
+              fontSize: 13,
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase' as const,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap' as const,
+            }}>
+              Regisztráció
+            </a>
+          </div>
         </nav>
 
-        {/* Hero */}
+        {/* ── Hero ────────────────────────────────────────────────── */}
         <section style={{
           minHeight: '100vh',
-          background: 'linear-gradient(45deg, #3B2222, #654328, #B59840, #FFEAAA)',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          padding: '6rem 2rem 4rem',
+          padding: '120px 48px 80px',
+          paddingTop: 80,
         }}>
-          <h1 className="playfair" style={{
-            fontSize: 'clamp(2.25rem, 5vw, 3.75rem)',
-            color: '#1A1510',
-            fontWeight: 700,
-            margin: '0 0 1.25rem',
-            lineHeight: 1.15,
-            maxWidth: '720px',
-          }}>
-            Az első benyomás a tied legyen.
-          </h1>
-          <p style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 200,
-            fontSize: 'clamp(1rem, 2vw, 1.25rem)',
-            color: 'rgba(26,21,16,0.75)',
-            maxWidth: '540px',
-            margin: '0 0 2.5rem',
-            lineHeight: 1.6,
-          }}>
-            DesignLead automatizálja az ügyfél-minősítést, hogy te a tervezésre koncentrálhass.
-          </p>
-          <Link
-            href="/onboard"
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 400,
-              fontSize: '0.875rem',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: '#1A1510',
-              background: '#FFFFFF',
-              border: '1px solid rgba(26,21,16,0.15)',
-              borderRadius: '2px',
-              padding: '0.875rem 2.5rem',
-              textDecoration: 'none',
-              display: 'inline-block',
-              transition: 'border-color 0.2s ease, background 0.2s ease',
-            }}
-          >
-            Kezdés
-          </Link>
-          <p style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 300,
-            fontSize: '0.75rem',
-            color: 'rgba(26,21,16,0.45)',
-            marginTop: '1.25rem',
-            letterSpacing: '0.05em',
-          }}>
-            Nincs ingyenes csomag. Nincs felesleges funkció.
-          </p>
-        </section>
+          <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%' }}>
+            <div className="hero-grid" style={{ display: 'flex', alignItems: 'center', gap: 64, flexWrap: 'wrap' }}>
 
-        {/* How it works */}
-        <section style={{
-          background: 'var(--dl-bg-page)',
-          padding: '5rem 2rem',
-          maxWidth: '1100px',
-          margin: '0 auto',
-        }}>
-          <h2 className="playfair" style={{
-            fontSize: 'clamp(1.5rem, 3vw, 2.25rem)',
-            color: 'var(--dl-text-primary)',
-            fontWeight: 700,
-            marginBottom: '0.75rem',
-          }}>
-            Hogy működik?
-          </h2>
-          <div className="section-rule" />
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '2rem',
-          }}>
-            {[
-              {
-                n: '01',
-                title: 'Ügyfél kitölti az intake-formot',
-                desc: 'Feltölti a fotókat, megadja az igényeit.',
-              },
-              {
-                n: '02',
-                title: 'AI minősíti a leadet',
-                desc: 'Automatikus brief, minőségi besorolás, válaszvázlat.',
-              },
-              {
-                n: '03',
-                title: 'Te csak a jó ügyfelekkel foglalkozol',
-                desc: 'A dashboardon minden rendezetten vár.',
-              },
-            ].map(step => (
-              <div key={step.n} style={{
-                borderLeft: '2px solid var(--dl-accent)',
-                paddingLeft: '1.5rem',
-              }}>
-                <span className="playfair" style={{
-                  fontSize: '2rem',
-                  color: 'var(--dl-accent)',
-                  fontWeight: 700,
-                  display: 'block',
-                  marginBottom: '0.75rem',
-                }}>
-                  {step.n}
-                </span>
-                <h3 style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 400,
-                  fontSize: '0.9375rem',
-                  color: 'var(--dl-text-primary)',
-                  margin: '0 0 0.5rem',
-                  letterSpacing: '0.02em',
-                }}>
-                  {step.title}
-                </h3>
+              {/* Left — text */}
+              <div className="hero-text" style={{ flex: '1 1 400px', maxWidth: 540 }}>
+
+                {/* Thread — thin accent line */}
+                <div style={{
+                  width: 40,
+                  height: 1,
+                  background: 'var(--dl-accent)',
+                  marginBottom: 16,
+                  transformOrigin: 'left',
+                  animation: 'thread-in 600ms var(--ease) 200ms both',
+                }} />
+
+                {/* Eyebrow */}
                 <p style={{
                   fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 200,
-                  fontSize: '0.875rem',
-                  color: 'var(--dl-text-muted)',
-                  margin: 0,
-                  lineHeight: 1.6,
+                  fontWeight: 300,
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--dl-accent)',
+                  margin: '0 0 16px',
+                  animation: 'cascade 600ms var(--ease) 300ms both',
                 }}>
-                  {step.desc}
+                  Belsőépítészeti platform
+                </p>
+
+                <h1 className="pf" style={{ fontWeight: 400, lineHeight: 1.2, marginBottom: 24 }}>
+                  <span style={{ display: 'block', fontSize: 'clamp(28px, 3.5vw, 40px)', color: 'var(--dl-text-primary)', wordBreak: 'normal', whiteSpace: 'normal', animation: `word-in 600ms var(--ease) 400ms both` }}>
+                    Minden érdeklődőből minősített ügyfél.
+                  </span>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 'clamp(28px, 3.5vw, 40px)',
+                      color: 'var(--dl-accent)',
+                      animation: `word-in 600ms var(--ease) ${400 + 4 * 70}ms both`,
+                    }}
+                  >
+                    Automatikusan.
+                  </span>
+                </h1>
+
+                {/* Horizontal rule — rule-in */}
+                <div style={{
+                  width: 64,
+                  height: 1,
+                  background: 'var(--dl-rule-gradient)',
+                  marginBottom: 24,
+                  transformOrigin: 'left',
+                  animation: 'rule-in 800ms var(--ease) 500ms both',
+                }} />
+
+                {/* Subline */}
+                <p
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 15,
+                    color: 'var(--dl-text-muted)', lineHeight: 1.8, marginBottom: 48,
+                    animation: 'cascade 720ms var(--ease) 1200ms both',
+                  }}
+                >
+                  Szobafotók, stílus, büdzsé — az AI 60 másodperc alatt megmondja, megéri-e a projekt, és milyen díjat érdemes ajánlani.
+                </p>
+
+                {/* CTAs */}
+                <div style={{ animation: 'cascade 720ms var(--ease) 1400ms both' }}>
+                  <Link href="/onboard" className="hero-cta">Kezdd el →</Link>
+                </div>
+              </div>
+
+              {/* Right — static lead card mockup inside phone frame */}
+              <div style={{ flex: '0 1 320px', display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'card-in 800ms var(--ease) 800ms both' }}>
+                {/* Phone shell */}
+                <div style={{
+                  width: 320,
+                  borderRadius: 36,
+                  border: '2px solid rgba(255,255,255,0.08)',
+                  background: 'var(--dl-bg-page)',
+                  boxShadow: '0 0 0 1px rgba(184,147,90,0.15), 0 32px 64px rgba(0,0,0,0.5)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                  {/* Notch bar */}
+                  <div style={{
+                    height: 8,
+                    background: 'var(--dl-bg-page)',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    flexShrink: 0,
+                  }} />
+                  {/* Scrollable card area */}
+                  <div style={{
+                    padding: '16px 16px 20px',
+                    overflowY: 'auto',
+                    scrollbarWidth: 'none',
+                    borderRadius: '0 0 28px 28px',
+                  }}>
+                    <div className="mock-card">
+                      {/* Card header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div>
+                          <div style={{
+                            fontFamily: 'Montserrat, sans-serif', fontSize: 18, fontWeight: 300,
+                            color: 'var(--dl-text-primary)', marginBottom: 4,
+                          }}>
+                            Kovács Anna
+                          </div>
+                          <div style={{
+                            fontFamily: 'Montserrat, sans-serif', fontSize: 13, fontWeight: 300,
+                            color: 'var(--dl-text-muted)',
+                          }}>
+                            Nappali, 28 m²
+                          </div>
+                        </div>
+                        <span className="mock-badge">Magas</span>
+                      </div>
+
+                      {/* Divider */}
+                      <div style={{ height: 1, background: 'var(--dl-border-default)', marginBottom: 16 }} />
+
+                      {/* Brief excerpt */}
+                      <div style={{ marginBottom: 20 }}>
+                        <div style={{
+                          fontFamily: 'Montserrat, sans-serif', fontSize: 11, fontWeight: 300,
+                          letterSpacing: '0.14em', textTransform: 'uppercase',
+                          color: 'var(--dl-accent)', marginBottom: 8,
+                        }}>
+                          AI Brief
+                        </div>
+                        <p style={{
+                          fontFamily: 'Montserrat, sans-serif', fontSize: 13, fontWeight: 200,
+                          color: 'var(--dl-text-muted)', lineHeight: 1.65, margin: 0,
+                        }}>
+                          Skandináv-minimalista nappali, természetes anyagok, semleges paletta. Büdzsé illeszkedés: kiváló — a 800 000 Ft-os keret reális.
+                        </p>
+                      </div>
+
+                      {/* Action button */}
+                      <button className="mock-btn">Válasz e-mail másolása</button>
+                    </div>
+                  </div>
+                </div>
+                {/* Caption */}
+                <p style={{
+                  fontFamily: 'Montserrat, sans-serif', fontSize: 11, fontWeight: 300,
+                  color: 'rgba(237,229,208,0.35)', marginTop: 12, textAlign: 'center',
+                  letterSpacing: '0.04em',
+                }}>
+                  Így jelenik meg az irányítópulton
                 </p>
               </div>
-            ))}
+
+            </div>
           </div>
         </section>
 
-        {/* Features */}
-        <section style={{
-          background: 'var(--dl-bg-elevated)',
-          padding: '5rem 2rem',
-        }}>
-          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-            <h2 className="playfair" style={{
-              fontSize: 'clamp(1.5rem, 3vw, 2.25rem)',
-              color: 'var(--dl-text-primary)',
-              fontWeight: 700,
-              marginBottom: '0.75rem',
-            }}>
-              Mit kapsz?
-            </h2>
-            <div className="section-rule" />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '1.5rem',
-            }}>
+        {/* ── How it works ─────────────────────────────────────────── */}
+        <section className="section-wrap" style={{ background: 'var(--dl-bg-elevated)', padding: '80px 48px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            <motion.div ref={howRef} {...scrollFade(howInView)}>
+              <p style={{
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
+                letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dl-accent)', marginBottom: 12,
+              }}>Folyamat</p>
+              <h2 className="pf" style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 400, color: 'var(--dl-text-primary)', marginBottom: 12 }}>
+                Hogy működik?
+              </h2>
+              <div className="rule" />
+            </motion.div>
+
+            <div className="step-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 40 }}>
               {[
                 {
-                  title: 'AI lead brief',
-                  desc: 'Minden beküldésből strukturált összefoglaló, automatikusan.',
+                  n: '01',
+                  title: 'Az ügyfél kitölti az űrlapot',
+                  desc: 'Szobafotók, stílus, büdzsé, határidő — mind egy helyen.',
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M7 8h10M7 12h6M7 16h4" />
+                    </svg>
+                  ),
                 },
                 {
-                  title: 'Válaszvázlat',
-                  desc: 'Kész e-mail tervezet, amit csak át kell nézni és elküldeni.',
+                  n: '02',
+                  title: 'Az AI 60 mp alatt minősít',
+                  desc: 'Projektösszefoglaló, büdzsé-illeszkedés, lead-minőség értékelés.',
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 3" />
+                    </svg>
+                  ),
                 },
                 {
-                  title: 'Branded intake oldal',
-                  desc: 'Saját URL-en, a te neved alatt.',
+                  n: '03',
+                  title: 'Már tudod, mit ajánlj',
+                  desc: 'Árajánlat-irány, lead-minőség, válaszvázlat — minden egy helyen, mielőtt felveszed a telefont.',
+                  icon: (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 8l9 6 9-6" />
+                      <rect x="3" y="6" width="18" height="12" rx="2" />
+                    </svg>
+                  ),
                 },
-              ].map(f => (
-                <div key={f.title} style={{
-                  background: 'var(--dl-bg-card)',
-                  border: '1px solid var(--dl-border-default)',
-                  borderRadius: '6px',
-                  padding: '2rem',
-                  transition: 'border-color 0.2s ease, background 0.2s ease',
-                }}>
+              ].map((step, i) => (
+                <motion.div
+                  key={step.n}
+                  custom={i}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, amount: 0.15 }}
+                  variants={cardVariants}
+                  style={{ borderLeft: '2px solid var(--dl-accent)', paddingLeft: 24 }}
+                >
+                  <div style={{ color: 'var(--dl-accent)', marginBottom: 12 }}>{step.icon}</div>
+                  <span className="pf" style={{
+                    fontSize: 40, fontWeight: 400, color: 'var(--dl-accent)', display: 'block', marginBottom: 12, lineHeight: 1,
+                  }}>{step.n}</span>
                   <h3 style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 400,
-                    fontSize: '0.9375rem',
-                    color: 'var(--dl-text-primary)',
-                    margin: '0 0 0.75rem',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                  }}>
-                    {f.title}
-                  </h3>
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 15,
+                    color: 'var(--dl-text-primary)', margin: '0 0 8px',
+                  }}>{step.title}</h3>
                   <p style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    fontWeight: 200,
-                    fontSize: '0.875rem',
-                    color: 'var(--dl-text-muted)',
-                    margin: 0,
-                    lineHeight: 1.65,
-                  }}>
-                    {f.desc}
-                  </p>
-                </div>
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                    color: 'var(--dl-text-muted)', margin: 0, lineHeight: 1.65,
+                  }}>{step.desc}</p>
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Pricing */}
-        <section style={{
-          background: 'var(--dl-bg-page)',
-          padding: '5rem 2rem',
-        }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <h2 className="playfair" style={{
-              fontSize: 'clamp(1.5rem, 3vw, 2.25rem)',
-              color: 'var(--dl-text-primary)',
-              fontWeight: 700,
-              marginBottom: '0.75rem',
-            }}>
-              Árak
-            </h2>
-            <div className="section-rule" />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '1.5rem',
-              marginBottom: '2.5rem',
-            }}>
-              {/* Alap */}
-              <div style={{
-                background: 'var(--dl-bg-card)',
-                border: '1px solid var(--dl-border-default)',
-                borderRadius: '6px',
-                padding: '2rem',
-              }}>
-                <p style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 300,
-                  fontSize: '0.6875rem',
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  color: 'var(--dl-text-muted)',
-                  margin: '0 0 0.5rem',
-                }}>
-                  Csomag
-                </p>
-                <h3 className="playfair" style={{
-                  fontSize: '1.75rem',
-                  color: 'var(--dl-text-primary)',
-                  fontWeight: 700,
-                  margin: '0 0 0.5rem',
-                }}>
-                  Alap
-                </h3>
-                <p className="playfair" style={{
-                  fontSize: '2rem',
-                  color: 'var(--dl-accent)',
-                  fontWeight: 700,
-                  margin: '0 0 1.5rem',
-                }}>
-                  ~
-                </p>
-                <ul style={{
-                  listStyle: 'none',
-                  margin: 0,
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.6rem',
-                }}>
-                  {['Intake form', 'AI brief', 'AI válaszvázlat', 'Saját URL'].map(feat => (
-                    <li key={feat} style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 200,
-                      fontSize: '0.875rem',
-                      color: 'var(--dl-text-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.625rem',
-                    }}>
-                      <span style={{ color: 'var(--dl-accent)', fontSize: '0.75rem' }}>✓</span>
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        <DemoPreview />
 
-              {/* Pro */}
-              <div style={{
-                background: 'var(--dl-bg-card)',
-                border: '1px solid var(--dl-border-accent)',
-                borderRadius: '6px',
-                padding: '2rem',
-                position: 'relative',
-              }}>
-                <span style={{
-                  position: 'absolute',
-                  top: '1.25rem',
-                  right: '1.25rem',
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 400,
-                  fontSize: '0.625rem',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: 'var(--dl-accent)',
-                  border: '1px solid var(--dl-accent)',
-                  borderRadius: '2px',
-                  padding: '0.2rem 0.5rem',
-                }}>
-                  Hamarosan
-                </span>
-                <p style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 300,
-                  fontSize: '0.6875rem',
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  color: 'var(--dl-text-muted)',
-                  margin: '0 0 0.5rem',
-                }}>
-                  Csomag
-                </p>
-                <h3 className="playfair" style={{
-                  fontSize: '1.75rem',
-                  color: 'var(--dl-text-primary)',
-                  fontWeight: 700,
-                  margin: '0 0 0.5rem',
-                }}>
-                  Pro
-                </h3>
-                <p className="playfair" style={{
-                  fontSize: '2rem',
-                  color: 'var(--dl-accent)',
-                  fontWeight: 700,
-                  margin: '0 0 1.5rem',
-                }}>
-                  ~
-                </p>
-                <ul style={{
-                  listStyle: 'none',
-                  margin: 0,
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.6rem',
-                }}>
-                  {['Minden ami Alap', 'AI concept renderek'].map(feat => (
-                    <li key={feat} style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 200,
-                      fontSize: '0.875rem',
-                      color: 'var(--dl-text-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.625rem',
-                    }}>
-                      <span style={{ color: 'var(--dl-accent)', fontSize: '0.75rem' }}>✓</span>
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+        {/* ── What you get ─────────────────────────────────────────── */}
+        <section className="section-wrap" style={{ padding: '80px 48px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            <motion.div ref={featRef} {...scrollFade(featInView)}>
+              <p style={{
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
+                letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dl-accent)', marginBottom: 12,
+              }}>Funkciók</p>
+              <h2 className="pf" style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 400, color: 'var(--dl-text-primary)', marginBottom: 12 }}>
+                Mit kapsz?
+              </h2>
+              <div className="rule" />
+            </motion.div>
 
-            <div style={{ textAlign: 'center' }}>
-              <Link
-                href="/onboard"
-                style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 400,
-                  fontSize: '0.875rem',
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: '#0F0D0A',
-                  background: 'var(--dl-accent)',
-                  border: 'none',
-                  borderRadius: '2px',
-                  padding: '0.875rem 2.5rem',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  transition: 'background 0.2s ease',
-                }}
-              >
-                Regisztráció
-              </Link>
+            <div className="feat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+              {[
+                {
+                  title: 'Projektösszefoglaló',
+                  desc: 'Scope, stílus, ügyfélprofil — a feltöltött fotókból generálva.',
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                      <polyline points="10 9 9 9 8 9" />
+                    </svg>
+                  ),
+                },
+                {
+                  title: 'Lead-minőség értékelés',
+                  desc: 'Magas / Közepes / Alacsony — indoklással, mielőtt felveszed a telefont.',
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                  ),
+                },
+                {
+                  title: 'AI által írt válasz e-mail',
+                  desc: 'Személyre szabva, a te hangnemédben — azonnal elküldhető.',
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 8l9 6 9-6" />
+                      <rect x="3" y="6" width="18" height="12" rx="2" />
+                    </svg>
+                  ),
+                },
+                {
+                  title: 'Saját hangnemedben',
+                  desc: 'Kedves és személyes, professzionális vagy lelkes — a rendszer a te stílusodban fogalmaz.',
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                  ),
+                },
+              ].map((card, i) => (
+                <motion.div
+                  key={card.title}
+                  className="feat-card"
+                  custom={i}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, amount: 0.15 }}
+                  variants={cardVariants}
+                >
+                  <div style={{ color: 'var(--dl-accent)', marginBottom: 16 }}>{card.icon}</div>
+                  <h3 style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 15,
+                    color: 'var(--dl-text-primary)', margin: '0 0 8px',
+                  }}>{card.title}</h3>
+                  <p style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                    color: 'var(--dl-text-muted)', margin: 0, lineHeight: 1.65,
+                  }}>{card.desc}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Footer */}
+        {/* ── CTA bridge ───────────────────────────────────────────── */}
+        <section className="section-wrap" style={{ padding: '40px 48px', textAlign: 'center' }}>
+          <a href="#pricing" className="hero-cta">Nézd meg az árakat →</a>
+        </section>
+
+        {/* ── Pricing ──────────────────────────────────────────────── */}
+        <section id="pricing" className="section-wrap" style={{ padding: '80px 48px' }}>
+          <div style={{ maxWidth: 900, margin: '0 auto' }}>
+            <motion.div ref={pricingRef} {...scrollFade(pricingInView)}>
+              <p style={{
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
+                letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dl-accent)', marginBottom: 12,
+              }}>Árazás</p>
+              <h2 className="pf" style={{ fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 400, color: 'var(--dl-text-primary)', marginBottom: 12 }}>
+                Egyszerű árazás
+              </h2>
+              <div className="rule" />
+            </motion.div>
+
+            <div className="price-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+
+              {/* Alap */}
+              <motion.div
+                className="price-card price-alap"
+                custom={0}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.15 }}
+                variants={cardVariants}
+              >
+                <p style={{
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
+                  letterSpacing: '0.14em', textTransform: 'uppercase',
+                  color: 'var(--dl-text-muted)', margin: '0 0 8px',
+                }}>Csomag</p>
+                <h3 className="pf" style={{ fontSize: 24, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 16px' }}>Alap</h3>
+                <p style={{ margin: '0 0 24px', lineHeight: 1 }}>
+                  <span style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28,
+                    color: 'var(--dl-accent)',
+                  }}>9 900</span>
+                  <span style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                    color: 'var(--dl-text-muted)', marginLeft: 8,
+                  }}>Ft / hó</span>
+                </p>
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
+                  {[
+                    'Korlátlan lead-fogadás',
+                    'AI brief + lead-minőség értékelés',
+                    'AI válasz e-mail draft',
+                    'Saját irányítópult',
+                  ].map(f => (
+                    <li key={f} style={{
+                      fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                      color: 'var(--dl-text-primary)', display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <span style={{ color: 'var(--dl-accent)', fontSize: 11, flexShrink: 0 }}>✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/onboard" className="price-cta-alap">Kezdd el →</Link>
+              </motion.div>
+
+              {/* Iroda */}
+              <motion.div
+                className="price-card price-iroda"
+                custom={1}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.15 }}
+                variants={cardVariants}
+              >
+                <p style={{
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
+                  letterSpacing: '0.14em', textTransform: 'uppercase',
+                  color: 'var(--dl-text-muted)', margin: '0 0 8px',
+                }}>Csomag</p>
+                <h3 className="pf" style={{ fontSize: 24, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 16px' }}>
+                  Iroda / Ügynökség
+                </h3>
+                <p style={{ margin: '0 0 24px', lineHeight: 1 }}>
+                  <span style={{
+                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28,
+                    color: 'var(--dl-text-muted)',
+                  }}>Egyedi</span>
+                </p>
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
+                  {[
+                    'Több tervező, egy fiók',
+                    'Prioritásos support',
+                    'Egyedi integráció',
+                    'Több tervező, egy irányítópult',
+                    'Egyedi lead-minőség szabályok',
+                    'API hozzáférés',
+                    'Dedikált onboarding',
+                  ].map(f => (
+                    <li key={f} style={{
+                      fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                      color: 'var(--dl-text-primary)', display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <span style={{ color: 'var(--dl-accent)', fontSize: 11, flexShrink: 0 }}>✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <a href="mailto:hello@spacio.app" className="price-cta-iroda">Lépj kapcsolatba →</a>
+              </motion.div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* ── Footer ───────────────────────────────────────────────── */}
         <footer style={{
-          background: 'var(--dl-bg-page)',
-          borderTop: '1px solid var(--dl-border-accent)',
-          padding: '2rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          maxWidth: '1100px',
-          margin: '0 auto',
+          borderTop: '1px solid var(--dl-border-default)',
+          padding: '32px 48px',
+          textAlign: 'center',
         }}>
-          <span className="playfair" style={{
-            fontSize: '1.125rem',
-            color: 'var(--dl-text-primary)',
-            fontWeight: 700,
-          }}>
-            DesignLead
-          </span>
           <span style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 200,
-            fontSize: '0.75rem',
-            color: 'var(--dl-text-muted)',
-            letterSpacing: '0.05em',
+            fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 11,
+            color: 'var(--dl-text-muted)', letterSpacing: '0.08em',
           }}>
-            © 2025 DesignLead. Minden jog fenntartva.
+            © 2026 Spacio · spacio.app
           </span>
         </footer>
+
       </div>
     </div>
   )
