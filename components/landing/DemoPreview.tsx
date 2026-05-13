@@ -71,25 +71,26 @@ export default function DemoPreview() {
   }
 
   useEffect(() => {
-    const section = document.getElementById('spacio-demo')
-    if (!section) { startDemo(); return }
-    if (!('IntersectionObserver' in window)) { startDemo(); return }
-
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) {
-        setTimeout(startDemo, 500)
-        obs.unobserve(section)
-      }
-    }, { threshold: 0.15 })
-
-    obs.observe(section)
-    return () => { obs.disconnect(); clearAll() }
-  }, [])
+    startDemo()
+    return () => { clearAll() }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isActive = (i: number) => stage === i ? 'demo-stage is-active' : 'demo-stage'
 
   return (
     <section id="spacio-demo" className="demo-section">
+      <div style={{
+        background: '#B8935A',
+        color: '#0F0D0A',
+        padding: '32px',
+        fontSize: '24px',
+        fontWeight: 700,
+        textAlign: 'center' as const,
+        position: 'relative' as const,
+        zIndex: 9999,
+      }}>
+        ★ DEMO SECTION IS HERE ★
+      </div>
       <div className="demo-wrap">
 
         <div className="demo-header">
