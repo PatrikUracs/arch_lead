@@ -66,7 +66,7 @@ function buildDigestHtml(designer: Designer, submissions: Submission[], dashboar
       </div>
     </div>
     <div style="padding:16px 40px 20px;border-top:1px solid rgba(201,169,110,0.08);">
-      <p style="margin:0;font-size:11px;color:rgba(245,240,232,0.25);">Daily digest from DesignLead &middot; You&rsquo;re receiving this because your notification preference is set to daily.</p>
+      <p style="margin:0;font-size:11px;color:rgba(245,240,232,0.25);">Daily digest from Spacio &middot; You&rsquo;re receiving this because your notification preference is set to daily.</p>
     </div>
   </div>
 </body>
@@ -76,7 +76,7 @@ function buildDigestHtml(designer: Designer, submissions: Submission[], dashboar
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -92,6 +92,8 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
   const resend = new Resend(process.env.RESEND_API_KEY)
+  const fromEmail = process.env.RESEND_FROM_EMAIL
+  if (!fromEmail) throw new Error('RESEND_FROM_EMAIL env var is required')
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -138,7 +140,7 @@ export async function GET(req: NextRequest) {
 
     try {
       await resend.emails.send({
-        from: `${studioName} <onboarding@resend.dev>`,
+        from: `Spacio <${fromEmail}>`,
         to: [designer.email],
         subject: `${subs.length} new lead${subs.length !== 1 ? 's' : ''} today — ${studioName}`,
         html,
