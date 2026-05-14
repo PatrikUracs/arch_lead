@@ -165,7 +165,7 @@ export default function DemoPreview() {
                   <button className="intake-btn">Beküldés →</button>
                 </div>
               </div>
-              <div className="demo-annotation" style={{ bottom: 24, left: 24 }}>
+              <div className="demo-annotation" style={{ bottom: 24, left: 24, zIndex: 10, pointerEvents: 'none' }}>
                 <strong>Step 1 — Az érdeklődő</strong>
                 A saját aldomain-eden, a stúdiód arculatában. Az ügyfél kitölt, beküld.
               </div>
@@ -186,7 +186,7 @@ export default function DemoPreview() {
                   <li><span className="marker">·</span><span>Válaszlevél írása</span></li>
                 </ul>
               </div>
-              <div className="demo-annotation" style={{ bottom: 24, left: 24 }}>
+              <div className="demo-annotation" style={{ bottom: 24, left: 24, zIndex: 10, pointerEvents: 'none' }}>
                 <strong>Step 2 — A rendszer dolgozik</strong>
                 Hatvan másodperc alatt minősítve. Csendben, gondosan, a háttérben.
               </div>
@@ -247,7 +247,7 @@ export default function DemoPreview() {
                   </div>
                 </div>
               </div>
-              <div className="demo-annotation" style={{ bottom: 24, left: 24 }}>
+              <div className="demo-annotation" style={{ bottom: 24, left: 24, zIndex: 10, pointerEvents: 'none' }}>
                 <strong>Step 3 — A tied</strong>
                 A te dashboardod, a te csapatod. Az új lead minőségpontszámmal érkezik.
               </div>
@@ -312,7 +312,7 @@ export default function DemoPreview() {
                   <span>Vágólapra másolva — készen áll a küldésre.</span>
                 </div>
               </div>
-              <div className="demo-annotation" style={{ top: 24, right: 24 }}>
+              <div className="demo-annotation" style={{ top: 24, right: 24, zIndex: 10, pointerEvents: 'none' }}>
                 <strong>Step 4 — A döntés</strong>
                 Megnyitod, átfutod, kimásolod. Egy kattintás — válasz a te hangnemedben.
               </div>

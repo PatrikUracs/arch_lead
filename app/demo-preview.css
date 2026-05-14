@@ -103,6 +103,7 @@
 /* Screen */
 .demo-screen {
   position: relative;
+  overflow: hidden;
   background: #0E0C09;
   height: 520px;
   overflow: hidden;
