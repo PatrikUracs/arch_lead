@@ -506,9 +506,19 @@
 
 /* ── Mobile ── */
 @media (max-width: 640px) {
-  .demo-screen       { height: 460px; }
+  .demo-screen       { height: 420px; }
   .intake-form       { grid-template-columns: 1fr; }
   .brief-stage-body  { grid-template-columns: 1fr; }
   .demo-steps        { gap: 16px; flex-wrap: wrap; }
   .demo-annotation   { max-width: 200px; font-size: 11px; padding: 10px 14px; }
+
+  .demo-wrap         { padding: 0 16px; }
+  .demo-window       { border-radius: 8px; }
+
+  .dash-stats        { flex-wrap: wrap; gap: 12px; }
+  .dash-topbar       { flex-wrap: wrap; gap: 8px; }
+
+  .brief-stage-foot  { flex-direction: column; align-items: stretch; gap: 8px; }
+  .brief-stage-foot button,
+  .brief-stage-foot a { width: 100%; text-align: center; }
 }

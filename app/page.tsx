@@ -1,5 +1,5 @@
 'use client'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useInView } from 'framer-motion'
 import Link from 'next/link'
 import SpacioLogo from '@/components/SpacioLogo'
@@ -34,6 +34,7 @@ export default function RootPage() {
   const featInView = useInView(featRef, { once: true, amount: 0.15 })
   const pricingRef = useRef(null)
   const pricingInView = useInView(pricingRef, { once: true, amount: 0.15 })
+  const [billingAnnual, setBillingAnnual] = useState(false)
 
   return (
     <div>
@@ -101,6 +102,9 @@ export default function RootPage() {
           .feat-grid { grid-template-columns: 1fr !important; }
           .testi-grid { grid-template-columns: 1fr !important; }
           .price-grid { grid-template-columns: 1fr !important; }
+          .nav-divider { display: none !important; }
+          .nav-login { display: none !important; }
+          .nav-reg { padding: 10px 14px !important; font-size: 11px !important; }
         }
       `}</style>
 
@@ -123,7 +127,7 @@ export default function RootPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ThemeToggle />
-            <a href="/dashboard" style={{
+            <a href="/dashboard" className="nav-login" style={{
               fontFamily: 'var(--font-montserrat)',
               fontSize: 13,
               fontWeight: 400,
@@ -136,8 +140,8 @@ export default function RootPage() {
             }}>
               Bejelentkezés
             </a>
-            <div style={{ width: 1, height: 16, background: 'var(--dl-border-default)', margin: '0 12px' }} />
-            <a href="/onboard" className="nav-link" style={{
+            <div className="nav-divider" style={{ width: 1, height: 16, background: 'var(--dl-border-default)', margin: '0 12px' }} />
+            <a href="/onboard" className="nav-link nav-reg" style={{
               background: 'transparent',
               border: '1px solid var(--dl-accent)',
               color: 'var(--dl-accent)',
@@ -180,20 +184,6 @@ export default function RootPage() {
                   animation: 'thread-in 600ms var(--ease) 200ms both',
                 }} />
 
-                {/* Eyebrow */}
-                <p style={{
-                  fontFamily: 'Montserrat, sans-serif',
-                  fontWeight: 300,
-                  fontSize: 11,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: 'var(--dl-accent)',
-                  margin: '0 0 16px',
-                  animation: 'cascade 600ms var(--ease) 300ms both',
-                }}>
-                  Belsőépítészeti platform
-                </p>
-
                 <h1 className="pf" style={{ fontWeight: 400, lineHeight: 1.2, marginBottom: 24 }}>
                   <span style={{ display: 'block', fontSize: 'clamp(28px, 3.5vw, 40px)', color: 'var(--dl-text-primary)', wordBreak: 'normal', whiteSpace: 'normal', animation: `word-in 600ms var(--ease) 400ms both` }}>
                     Minden érdeklődőből minősített ügyfél.
@@ -228,7 +218,7 @@ export default function RootPage() {
                     animation: 'cascade 720ms var(--ease) 1200ms both',
                   }}
                 >
-                  Szobafotók, stílus, büdzsé — az AI 60 másodperc alatt megmondja, megéri-e a projekt, és milyen díjat érdemes ajánlani.
+                  Az ügyfél kitölti az űrlapot — 60 másodperc alatt megtudod, megéri-e a projekten dolgozni, és milyen díjat érdemes ajánlani.
                 </p>
 
                 {/* CTAs */}
@@ -492,7 +482,7 @@ export default function RootPage() {
 
         {/* ── Pricing ──────────────────────────────────────────────── */}
         <section id="pricing" className="section-wrap" style={{ padding: '80px 48px' }}>
-          <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <motion.div ref={pricingRef} {...scrollFade(pricingInView)}>
               <p style={{
                 fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
@@ -502,97 +492,165 @@ export default function RootPage() {
                 Egyszerű árazás
               </h2>
               <div className="rule" />
+
+              {/* Billing toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
+                <span style={{
+                  fontFamily: 'Montserrat, sans-serif', fontSize: 12, fontWeight: 400,
+                  color: 'var(--dl-text-primary)', cursor: 'pointer',
+                }} onClick={() => setBillingAnnual(false)}>Havi</span>
+                <div onClick={() => setBillingAnnual(a => !a)} style={{
+                  width: 44, height: 24, borderRadius: 12, cursor: 'pointer', position: 'relative',
+                  background: billingAnnual ? 'rgba(184,147,90,0.4)' : 'rgba(184,147,90,0.15)',
+                  border: '1px solid rgba(184,147,90,0.3)', transition: 'background .2s',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', background: 'var(--dl-accent)',
+                    position: 'absolute', top: 2, left: 2,
+                    transform: billingAnnual ? 'translateX(20px)' : 'translateX(0)',
+                    transition: 'transform .2s',
+                  }} />
+                </div>
+                <span style={{
+                  fontFamily: 'Montserrat, sans-serif', fontSize: 12, fontWeight: 400,
+                  color: billingAnnual ? 'var(--dl-text-primary)' : 'var(--dl-text-muted)', cursor: 'pointer',
+                }} onClick={() => setBillingAnnual(true)}>Éves</span>
+                {billingAnnual && (
+                  <span style={{
+                    fontFamily: 'Montserrat, sans-serif', fontSize: 11, fontWeight: 300,
+                    color: 'var(--dl-accent)', background: 'rgba(184,147,90,0.1)',
+                    border: '1px solid rgba(184,147,90,0.2)', borderRadius: 2,
+                    padding: '2px 8px', letterSpacing: '0.06em',
+                  }}>2 hónap ingyen</span>
+                )}
+              </div>
             </motion.div>
 
-            <div className="price-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div className="price-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
 
-              {/* Alap */}
-              <motion.div
-                className="price-card price-alap"
-                custom={0}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.15 }}
-                variants={cardVariants}
-              >
-                <p style={{
-                  fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
-                  letterSpacing: '0.14em', textTransform: 'uppercase',
-                  color: 'var(--dl-text-muted)', margin: '0 0 8px',
-                }}>Csomag</p>
-                <h3 className="pf" style={{ fontSize: 24, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 16px' }}>Alap</h3>
-                <p style={{ margin: '0 0 24px', lineHeight: 1 }}>
-                  <span style={{
-                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28,
-                    color: 'var(--dl-accent)',
-                  }}>9 900</span>
-                  <span style={{
-                    fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
-                    color: 'var(--dl-text-muted)', marginLeft: 8,
-                  }}>Ft / hó</span>
+              {/* Base */}
+              <motion.div className="price-card price-iroda" custom={0} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} variants={cardVariants}>
+                <h3 className="pf" style={{ fontSize: 22, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 4px' }}>Base</h3>
+                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 12, color: 'var(--dl-text-muted)', margin: '0 0 20px' }}>Önálló tervezőknek</p>
+                <p style={{ margin: '0 0 4px', lineHeight: 1 }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28, color: 'var(--dl-accent)' }}>
+                    {billingAnnual ? '4 900' : '6 900'}
+                  </span>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13, color: 'var(--dl-text-muted)', marginLeft: 8 }}>HUF/hó</span>
                 </p>
+                {billingAnnual
+                  ? <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-accent)', margin: '0 0 20px', fontWeight: 300 }}>Megtakarítás: 24 000 HUF/év</p>
+                  : <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-text-muted)', margin: '0 0 20px', fontWeight: 200 }}>havonta számlázva</p>
+                }
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
                   {[
-                    'Korlátlan lead-fogadás',
-                    'AI brief + lead-minőség értékelés',
-                    'AI válasz e-mail draft',
-                    'Saját irányítópult',
+                    { label: '4 lead / hó', on: true },
+                    { label: 'AI projektösszefoglaló', on: true },
+                    { label: 'Lead-minőség értékelés', on: true },
+                    { label: 'Díjirányzat', on: true },
+                    { label: 'AI válasz e-mail draft', on: true },
+                    { label: 'Digest értesítés', on: true },
+                    { label: 'AI renderek', on: false },
+                    { label: 'Branded eredményoldal', on: false },
+                    { label: '5 felhasználói fiók', on: false },
                   ].map(f => (
-                    <li key={f} style={{
+                    <li key={f.label} style={{
                       fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
-                      color: 'var(--dl-text-primary)', display: 'flex', alignItems: 'center', gap: 10,
+                      color: f.on ? 'var(--dl-text-primary)' : 'rgba(237,229,208,0.2)',
+                      display: 'flex', alignItems: 'center', gap: 10,
                     }}>
-                      <span style={{ color: 'var(--dl-accent)', fontSize: 11, flexShrink: 0 }}>✓</span>
-                      {f}
+                      <span style={{ color: f.on ? 'var(--dl-accent)' : 'rgba(184,147,90,0.2)', fontSize: 11, flexShrink: 0 }}>—</span>
+                      {f.label}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/onboard" className="price-cta-iroda">Kezdd el →</Link>
+              </motion.div>
+
+              {/* Base Pro */}
+              <motion.div className="price-card price-alap" custom={1} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} variants={cardVariants} style={{ borderTop: '2px solid var(--dl-accent)', position: 'relative' }}>
+                <div style={{
+                  position: 'absolute', top: -1, right: 16,
+                  fontFamily: 'Montserrat, sans-serif', fontSize: 10, fontWeight: 400,
+                  letterSpacing: '0.1em', textTransform: 'uppercase',
+                  background: 'var(--dl-accent)', color: 'var(--dl-bg-page)',
+                  borderRadius: '0 0 2px 2px', padding: '3px 10px',
+                }}>Ajánlott</div>
+                <h3 className="pf" style={{ fontSize: 22, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 4px' }}>Base Pro</h3>
+                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 12, color: 'var(--dl-text-muted)', margin: '0 0 20px' }}>Tapasztalt önálló tervezőknek</p>
+                <p style={{ margin: '0 0 4px', lineHeight: 1 }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28, color: 'var(--dl-accent)' }}>
+                    {billingAnnual ? '11 900' : '14 900'}
+                  </span>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13, color: 'var(--dl-text-muted)', marginLeft: 8 }}>HUF/hó</span>
+                </p>
+                {billingAnnual
+                  ? <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-accent)', margin: '0 0 20px', fontWeight: 300 }}>Megtakarítás: 36 000 HUF/év</p>
+                  : <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-text-muted)', margin: '0 0 20px', fontWeight: 200 }}>havonta számlázva</p>
+                }
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
+                  {[
+                    { label: '15 lead / hó', on: true },
+                    { label: 'AI projektösszefoglaló', on: true },
+                    { label: 'Lead-minőség értékelés', on: true },
+                    { label: 'Díjirányzat', on: true },
+                    { label: 'AI válasz e-mail draft', on: true },
+                    { label: 'Azonnali + digest értesítés', on: true },
+                    { label: 'AI renderek', on: true },
+                    { label: 'Branded eredményoldal', on: true },
+                    { label: '5 felhasználói fiók', on: false },
+                  ].map(f => (
+                    <li key={f.label} style={{
+                      fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
+                      color: f.on ? 'var(--dl-text-primary)' : 'rgba(237,229,208,0.2)',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <span style={{ color: f.on ? 'var(--dl-accent)' : 'rgba(184,147,90,0.2)', fontSize: 11, flexShrink: 0 }}>—</span>
+                      {f.label}
                     </li>
                   ))}
                 </ul>
                 <Link href="/onboard" className="price-cta-alap">Kezdd el →</Link>
               </motion.div>
 
-              {/* Iroda */}
-              <motion.div
-                className="price-card price-iroda"
-                custom={1}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.15 }}
-                variants={cardVariants}
-              >
-                <p style={{
-                  fontFamily: 'Montserrat, sans-serif', fontWeight: 300, fontSize: 11,
-                  letterSpacing: '0.14em', textTransform: 'uppercase',
-                  color: 'var(--dl-text-muted)', margin: '0 0 8px',
-                }}>Csomag</p>
-                <h3 className="pf" style={{ fontSize: 24, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 16px' }}>
-                  Iroda / Ügynökség
-                </h3>
-                <p style={{ margin: '0 0 24px', lineHeight: 1 }}>
-                  <span style={{
-                    fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28,
-                    color: 'var(--dl-text-muted)',
-                  }}>Egyedi</span>
+              {/* Studio */}
+              <motion.div className="price-card price-iroda" custom={2} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} variants={cardVariants}>
+                <h3 className="pf" style={{ fontSize: 22, fontWeight: 400, color: 'var(--dl-text-primary)', margin: '0 0 4px' }}>Studio</h3>
+                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 12, color: 'var(--dl-text-muted)', margin: '0 0 20px' }}>Stúdióknak és nagy volumenű tervezőknek</p>
+                <p style={{ margin: '0 0 4px', lineHeight: 1 }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 400, fontSize: 28, color: 'var(--dl-accent)' }}>
+                    {billingAnnual ? '24 900' : '29 900'}
+                  </span>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13, color: 'var(--dl-text-muted)', marginLeft: 8 }}>HUF/hó</span>
                 </p>
+                {billingAnnual
+                  ? <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-accent)', margin: '0 0 20px', fontWeight: 300 }}>Megtakarítás: 60 000 HUF/év</p>
+                  : <p style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 11, color: 'var(--dl-text-muted)', margin: '0 0 20px', fontWeight: 200 }}>havonta számlázva</p>
+                }
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
                   {[
-                    'Több tervező, egy fiók',
-                    'Prioritásos support',
-                    'Egyedi integráció',
-                    'Több tervező, egy irányítópult',
-                    'Egyedi lead-minőség szabályok',
-                    'API hozzáférés',
-                    'Dedikált onboarding',
+                    { label: 'Korlátlan lead', on: true },
+                    { label: 'AI projektösszefoglaló', on: true },
+                    { label: 'Lead-minőség értékelés', on: true },
+                    { label: 'Díjirányzat', on: true },
+                    { label: 'AI válasz e-mail draft', on: true },
+                    { label: 'Azonnali + digest értesítés', on: true },
+                    { label: 'AI renderek', on: true },
+                    { label: 'Branded eredményoldal', on: true },
+                    { label: '5 felhasználói fiók', on: true },
+                    { label: 'Prioritásos support', on: true },
                   ].map(f => (
-                    <li key={f} style={{
+                    <li key={f.label} style={{
                       fontFamily: 'Montserrat, sans-serif', fontWeight: 200, fontSize: 13,
-                      color: 'var(--dl-text-primary)', display: 'flex', alignItems: 'center', gap: 10,
+                      color: 'var(--dl-text-primary)',
+                      display: 'flex', alignItems: 'center', gap: 10,
                     }}>
-                      <span style={{ color: 'var(--dl-accent)', fontSize: 11, flexShrink: 0 }}>✓</span>
-                      {f}
+                      <span style={{ color: 'var(--dl-accent)', fontSize: 11, flexShrink: 0 }}>—</span>
+                      {f.label}
                     </li>
                   ))}
                 </ul>
-                <a href="mailto:hello@spacio.app" className="price-cta-iroda">Lépj kapcsolatba →</a>
+                <a href="mailto:hello@spacio.app" className="price-cta-iroda">Kapcsolatfelvétel →</a>
               </motion.div>
 
             </div>
